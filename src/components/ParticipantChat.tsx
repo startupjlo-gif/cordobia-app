@@ -3,15 +3,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   AgujeroType,
-  Caso,
   ChipOption,
   EcosistemaType,
   EleccionCaso,
-  Empresa,
   IntensidadAgujero,
   Mensaje,
   NumEmpleadosType,
-  Participante,
   RespuestaNivel,
   SectorType,
   TareaParticipante
@@ -25,7 +22,7 @@ import {
 import { generarDiagnosticoCompleto } from '@/lib/rules-engine';
 import { LocalMockStore } from '@/lib/supabase/mock-store';
 import { BrandingBanner } from './BrandingBanner';
-import { CheckCircle, ArrowRight, Lock, Sparkles, Building2 } from 'lucide-react';
+import { CheckCircle, ArrowRight, Lock, Sparkles, Building2, PauseCircle, PlayCircle } from 'lucide-react';
 
 interface ParticipantChatProps {
   sessionCode?: string;
@@ -37,6 +34,10 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
   const [consentimientoAceptado, setConsentimientoAceptado] = useState<boolean>(false);
   const [pasoIniciado, setPasoIniciado] = useState<boolean>(false);
 
+  // Mentor Pause States
+  const [esperandoAutorizacionMentor, setEsperandoAutorizacionMentor] = useState<boolean>(false);
+  const [etapaEnPausaTexto, setEtapaEnPausaTexto] = useState<string>('');
+
   // Paso 1 Form state
   const [nombre, setNombre] = useState<string>('');
   const [empresaNombre, setEmpresaNombre] = useState<string>('');
@@ -47,7 +48,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
   const [herramientasDesuso, setHerramientasDesuso] = useState<string>('');
   const [confirmacionPaso1, setConfirmacionPaso1] = useState<boolean>(false);
 
-  // Paso 2 State (Agujeros)
+  // Paso 2 State (Fugas)
   const [rondaActual, setRondaActual] = useState<number>(1);
   const [eleccionesCasos, setEleccionesCasos] = useState<EleccionCaso[]>([]);
   const [primeraEleccionRonda, setPrimeraEleccionRonda] = useState<string | null>(null);
@@ -108,14 +109,14 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
 
   const handleConfirmarPaso1 = () => {
     setConfirmacionPaso1(true);
-    agregarMensajeParticipante('✅ Datos de empresa confirmados.');
+    agregarMensajeParticipante('✅ Ficha de empresa confirmada.');
     setIsTyping(true);
 
     setTimeout(() => {
       setIsTyping(false);
       setPasoActual(2);
       agregarMensajeAgente(
-        `¡Perfecto, ${nombre}! Ficha guardada para ${empresaNombre}. Avanzamos al Paso 2 de 4.\n\nTe presentaré situaciones cotidianas de negocio. Elige con cuál te sientes más identificado.`
+        `¡Perfecto, ${nombre}! Ficha guardada para ${empresaNombre}.\n\nEtapa 1: Analizaremos dónde se produce la mayor fuga de tiempo o recursos. Te presentaré 4 situaciones cotidianas.`
       );
 
       const casosR1 = CASOS_BASE_BALDE.filter((c) => c.ronda === 1);
@@ -165,14 +166,13 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
           );
         }, 500);
       } else {
-        // All rounds complete -> Ask intensity using TRANSPARENT case summaries (NO internal variable names exposed!)
         setIsTyping(true);
         setTimeout(() => {
           setIsTyping(false);
           const agujeros: AgujeroType[] = ['Tiempo', 'Procesos', 'Datos', 'Cliente'];
           const resumen0 = CASOS_RESUMEN_TEXT[agujeros[0]];
           agregarMensajeAgente(
-            `¡Muy bien! Tras revisar estas situaciones, ¿con qué FRECUENCIA se presenta en tu empresa este tipo de escenario?\n\n👉 *"${resumen0}"*`,
+            `¡Muy bien! Tras revisar estas situaciones, ¿con qué FRECUENCIA se presenta este tipo de escenario en tu empresa?\n\n👉 *"${resumen0}"*`,
             [
               { id: 'i1', label: '1 - Nunca', value: 1 },
               { id: 'i2', label: '2 - Rara vez', value: 2 },
@@ -215,58 +215,75 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
         );
       }, 500);
     } else {
-      // Move to Step 3 (Matriz Frecuencia / Valor)
+      // END OF ETAPA 1 (LEAKS) -> PAUSE & WAIT FOR MENTOR PERMISSION!
       setIsTyping(true);
       setTimeout(() => {
         setIsTyping(false);
-        setPasoActual(3);
         agregarMensajeAgente(
-          'Gracias, seguimos.\n\nPaso 3 de 4: Matriz Frecuencia / Valor. Vamos a analizar la recurrencia e impacto de las tareas operativas de tu empresa.'
+          `🛑 **Excelente, hasta aquí hemos identificado el principal punto de fuga de tu empresa.**\n\nVamos a hacer una breve pausa para revisar este punto con tu mentor antes de pasar a clasificar tus tareas en los cuadrantes de la matriz.`
         );
 
-        const tareasIniciales: TareaParticipante[] = [
-          {
-            tarea_id: 'T01',
-            nombre: 'Responder consultas frecuentes de clientes (WhatsApp/email)',
-            area: 'Atención al cliente',
-            nivel: 'N1',
-            frecuencia: 'Diaria',
-            valor: 'El cliente lo nota',
-            horas_semana: 7.5
-          },
-          {
-            tarea_id: 'T03',
-            nombre: 'Registrar y conciliar facturas',
-            area: 'Facturación',
-            nivel: 'N1',
-            frecuencia: 'Varias veces por semana',
-            valor: 'Una molestia interna',
-            horas_semana: 4.0
-          },
-          {
-            tarea_id: 'T06',
-            nombre: 'Seguimiento de clientes y presupuestos enviados',
-            area: 'Ventas',
-            nivel: 'N2',
-            frecuencia: 'Diaria',
-            valor: 'Perdemos una venta o dinero',
-            horas_semana: 5.0
-          }
-        ];
-        setTareasSeleccionadas(tareasIniciales);
-
-        agregarMensajeAgente(
-          `Comenzamos evaluando la tarea: **"${tareasIniciales[0].nombre}"**.\n\n¿Con qué FRECUENCIA se realiza?`,
-          [
-            { id: 'f_diaria', label: 'Diaria', value: 'Diaria' },
-            { id: 'f_varias', label: 'Varias veces por semana', value: 'Varias veces por semana' },
-            { id: 'f_semanal', label: 'Semanal', value: 'Semanal' },
-            { id: 'f_mensual', label: 'Mensual', value: 'Mensual' },
-            { id: 'f_ocasional', label: 'Ocasional', value: 'Ocasional' }
-          ]
-        );
+        setEsperandoAutorizacionMentor(true);
+        setEtapaEnPausaTexto('Etapa 1 Completada (Punto de Fuga Identificado)');
       }, 700);
     }
+  };
+
+  // Mentor Continuation Handler (Etapa 1 -> Etapa 2)
+  const handleContinuarMentorEtapa2 = () => {
+    setEsperandoAutorizacionMentor(false);
+    agregarMensajeParticipante('▶️ Autorización del mentor confirmada. Continuando...');
+    setPasoActual(3);
+
+    setIsTyping(true);
+    setTimeout(() => {
+      setIsTyping(false);
+      agregarMensajeAgente(
+        'Etapa 2: Matriz Frecuencia y Valor. Evaluaremos tus tareas operativas habituales para clasificarlas en los cuadrantes (Oro, Zombi, Cuello de botella, Grasa).'
+      );
+
+      const tareasIniciales: TareaParticipante[] = [
+        {
+          tarea_id: 'T01',
+          nombre: 'Responder consultas frecuentes de clientes (WhatsApp/email)',
+          area: 'Atención al cliente',
+          nivel: 'N1',
+          frecuencia: 'Diaria',
+          valor: 'El cliente lo nota',
+          horas_semana: 7.5
+        },
+        {
+          tarea_id: 'T03',
+          nombre: 'Registrar y conciliar facturas',
+          area: 'Facturación',
+          nivel: 'N1',
+          frecuencia: 'Varias veces por semana',
+          valor: 'Una molestia interna',
+          horas_semana: 4.0
+        },
+        {
+          tarea_id: 'T06',
+          nombre: 'Seguimiento de clientes y presupuestos enviados',
+          area: 'Ventas',
+          nivel: 'N2',
+          frecuencia: 'Diaria',
+          valor: 'Perdemos una venta o dinero',
+          horas_semana: 5.0
+        }
+      ];
+      setTareasSeleccionadas(tareasIniciales);
+
+      agregarMensajeAgente(
+        `Evaluando tarea: **"${tareasIniciales[0].nombre}"**.\n\n¿Con qué FRECUENCIA se realiza?`,
+        [
+          { id: 'f_diaria', label: 'Diaria', value: 'Diaria' },
+          { id: 'f_varias', label: 'Varias veces por semana', value: 'Varias veces por semana' },
+          { id: 'f_semanal', label: 'Semanal', value: 'Semanal' },
+          { id: 'f_mensual', label: 'Mensual', value: 'Mensual' },
+          { id: 'f_ocasional', label: 'Ocasional', value: 'Ocasional' }
+        ]
+      );
+    }, 700);
   };
 
   const handleRespuestaTareaPaso3 = (valorChoice: string) => {
@@ -299,7 +316,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
       setTimeout(() => {
         setIsTyping(false);
         agregarMensajeAgente(
-          `¿Cuántas HORAS semanales aproximadamente consume esa tarea en tu empresa?`,
+          `¿Cuántas HORAS semanales aproximadamente insume esa tarea en tu empresa?`,
           [
             { id: 'h1', label: 'Menos de 1h', value: '0.5' },
             { id: 'h2', label: '1 – 3h', value: '2.0' },
@@ -333,22 +350,39 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
           );
         }, 500);
       } else {
-        // Step 3 finished -> Move to Step 4
+        // END OF ETAPA 2 (MATRIZ TAREAS) -> PAUSE & WAIT FOR MENTOR PERMISSION!
         setIsTyping(true);
         setTimeout(() => {
           setIsTyping(false);
-          setPasoActual(4);
           agregarMensajeAgente(
-            'Paso 4 de 4: Evaluación Flight Levels (Salud Organizativa).\n\nResponderemos 9 preguntas rápidas de opción múltiple.'
+            `🛑 **Excelente, hemos analizado y clasificado tus actividades operativas en la matriz.**\n\nIdentificamos el potencial de automatización (tareas Zombi) y los Cuellos de Botella principales. Esperamos la orden de tu mentor para iniciar la etapa de Flight Levels (Salud Organizativa).`
           );
-          const preg1 = PREGUNTAS_FLIGHT_LEVELS[0];
-          agregarMensajeAgente(
-            `Pregunta 1/9 (${preg1.nivel} - ${preg1.actividad}):\n${preg1.pregunta}`,
-            preg1.opciones.map((o) => ({ id: o.id, label: o.label, value: o.value }))
-          );
+
+          setEsperandoAutorizacionMentor(true);
+          setEtapaEnPausaTexto('Etapa 2 Completada (Matriz Frecuencia / Valor)');
         }, 700);
       }
     }
+  };
+
+  // Mentor Continuation Handler (Etapa 2 -> Etapa 3 Flight Levels)
+  const handleContinuarMentorEtapa3 = () => {
+    setEsperandoAutorizacionMentor(false);
+    agregarMensajeParticipante('▶️ Autorización del mentor confirmada. Continuando a Flight Levels...');
+    setPasoActual(4);
+
+    setIsTyping(true);
+    setTimeout(() => {
+      setIsTyping(false);
+      agregarMensajeAgente(
+        'Etapa 3: Evaluación Flight Levels (Salud Organizativa N1, N2, N3).\n\nResponderemos 9 preguntas rápidas de opción múltiple.'
+      );
+      const preg1 = PREGUNTAS_FLIGHT_LEVELS[0];
+      agregarMensajeAgente(
+        `Pregunta 1/9 (${preg1.nivel} - ${preg1.actividad}):\n${preg1.pregunta}`,
+        preg1.opciones.map((o) => ({ id: o.id, label: o.label, value: o.value }))
+      );
+    }, 700);
   };
 
   const handleRespuestaFlightLevel = (puntosValue: number, label: string) => {
@@ -407,7 +441,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
         mockStore.resultados.set(partId, resultadoFinal);
 
         agregarMensajeAgente(
-          `🎉 ¡Excelente, ${nombre}! Has completado todos los pasos del diagnóstico para **${empresaNombre}**.\n\nTu facilitador analizará los resultados consolidados con el grupo y te entregará el diagnóstico individual de tu empresa.`
+          `🎉 **¡Diagnóstico Finalizado con Éxito para ${empresaNombre}!**\n\nHemos completado la medición de salud organizativa. Tu facilitador proyectará el resumen del grupo y te entregará el informe detallado en PDF.`
         );
       }, 800);
     }
@@ -433,7 +467,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
             </div>
 
             <p className="text-slate-600 text-sm leading-relaxed">
-              Bienvenido al diagnóstico dinámico de transformación digital. En unos 20-25 minutos analizaremos tus situaciones cotidianas de negocio, procesos repetitivos y salud organizativa.
+              Bienvenido al diagnóstico dinámico con pausas asistidas por tu mentor. Evaluaremos tus situaciones cotidianas, actividades operativas y salud organizativa por etapas.
             </p>
 
             <div className="bg-[#CCBBEE]/20 border border-[#CCBBEE]/40 rounded-xl p-4 space-y-3">
@@ -469,7 +503,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
             <div className="bg-[#2A1545] px-6 py-3 border-b border-white/10 flex items-center justify-between text-white text-xs">
               <div className="flex items-center gap-2 font-semibold">
                 <span className="w-2 h-2 rounded-full bg-[#ED7D31] animate-pulse"></span>
-                <span>Paso {pasoActual} de 4</span>
+                <span>Etapa {pasoActual} de 4</span>
               </div>
               <div className="w-36 bg-white/20 rounded-full h-2 overflow-hidden">
                 <div
@@ -495,7 +529,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
                   >
                     <p className="whitespace-pre-line font-normal">{m.texto}</p>
 
-                    {m.opciones_chips && (
+                    {m.opciones_chips && !esperandoAutorizacionMentor && (
                       <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2">
                         {m.opciones_chips.map((chip) => (
                           <button
@@ -525,7 +559,27 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
                 </div>
               ))}
 
-              {/* Paso 1 Input Form */}
+              {/* MENTOR PAUSE CARD */}
+              {esperandoAutorizacionMentor && (
+                <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 shadow-lg space-y-3 animate-pulse">
+                  <div className="flex items-center gap-2 text-amber-800 font-bold text-sm">
+                    <PauseCircle className="w-5 h-5 text-amber-600" />
+                    <span>{etapaEnPausaTexto}</span>
+                  </div>
+                  <p className="text-xs text-amber-900 leading-relaxed">
+                    El asistente ha pausado el avance. En este momento tu mentor explicará los hallazgos en la pantalla principal antes de iniciar la siguiente etapa.
+                  </p>
+                  <button
+                    onClick={pasoActual === 2 ? handleContinuarMentorEtapa2 : handleContinuarMentorEtapa3}
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-[#2A1545] to-[#43236b] hover:from-[#371b5c] hover:to-[#2A1545] text-white font-bold text-xs shadow flex items-center justify-center gap-2 cursor-pointer transition-all"
+                  >
+                    <PlayCircle className="w-4 h-4 text-[#ED7D31]" />
+                    <span>El Mentor ha Autorizado Continuar</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Paso 1 Form */}
               {pasoActual === 1 && !confirmacionPaso1 && mensajes.length > 0 && (
                 <div className="bg-white rounded-xl p-4 md:p-6 border border-[#CCBBEE] shadow-md space-y-4 my-2">
                   <div className="flex items-center gap-2 font-bold text-[#2A1545] text-sm">
@@ -614,7 +668,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
                     }`}
                   >
                     <CheckCircle className="w-4 h-4 text-[#ED7D31]" />
-                    <span>Confirmar Datos y Pasar al Paso 2</span>
+                    <span>Confirmar Datos e Iniciar Etapa 1</span>
                   </button>
                 </div>
               )}
