@@ -29,15 +29,14 @@ interface ParticipantChatProps {
 }
 
 export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 'CORDOBIA2026' }) => {
-  // Participant State
-  const [pasoActual, setPasoActual] = useState<number>(1);
+  // Etapa state (1: Ficha & Casos, 2: Intensidad & Matriz, 3: Flight Levels)
+  const [etapaActual, setEtapaActual] = useState<number>(1);
   const [consentimientoAceptado, setConsentimientoAceptado] = useState<boolean>(false);
   const [pasoIniciado, setPasoIniciado] = useState<boolean>(false);
 
-  // Mentor Pause States
+  // Mentor Pause Control State
   const [esperandoAutorizacionMentor, setEsperandoAutorizacionMentor] = useState<boolean>(false);
   const [etapaEnPausaTexto, setEtapaEnPausaTexto] = useState<string>('');
-  const [etapaAutorizadaMentor, setEtapaAutorizadaMentor] = useState<number>(1);
 
   // Paso 1 Form state
   const [nombre, setNombre] = useState<string>('');
@@ -49,19 +48,20 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
   const [herramientasDesuso, setHerramientasDesuso] = useState<string>('');
   const [confirmacionPaso1, setConfirmacionPaso1] = useState<boolean>(false);
 
-  // Paso 2 State (Fugas)
+  // Etapa 1 State (Selección de Casos)
   const [rondaActual, setRondaActual] = useState<number>(1);
   const [eleccionesCasos, setEleccionesCasos] = useState<EleccionCaso[]>([]);
   const [primeraEleccionRonda, setPrimeraEleccionRonda] = useState<string | null>(null);
+
+  // Etapa 2 State (Intensidades + Matriz Tareas)
   const [intensidades, setIntensidades] = useState<IntensidadAgujero[]>([]);
   const [agujeroIntensidadIndex, setAgujeroIntensidadIndex] = useState<number>(0);
-
-  // Paso 3 State (Matriz Tareas)
+  const [subfaseEtapa2, setSubfaseEtapa2] = useState<'intensidades' | 'matriz'>('intensidades');
   const [tareasSeleccionadas, setTareasSeleccionadas] = useState<TareaParticipante[]>([]);
   const [tareaIndexPreguntas, setTareaIndexPreguntas] = useState<number>(0);
   const [fasePreguntaTarea, setFasePreguntaTarea] = useState<'frecuencia' | 'valor' | 'horas'>('frecuencia');
 
-  // Paso 4 State (Flight Levels)
+  // Etapa 3 State (Flight Levels)
   const [preguntaIndexFL, setPreguntaIndexFL] = useState<number>(0);
   const [respuestasFL, setRespuestasFL] = useState<RespuestaNivel[]>([]);
   const [diagnosticoFinalizado, setDiagnosticoFinalizado] = useState<boolean>(false);
@@ -73,18 +73,18 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
 
   const mockStore = LocalMockStore.getInstance();
 
-  // REALTIME LISTEN TO FACILITATOR STAGE AUTHORIZATION BROADCAST
+  // REALTIME LISTEN TO MENTOR AUTHORIZATION BROADCAST
   useEffect(() => {
     const unsubscribe = mockStore.onEtapaCambiada((nuevaEtapa) => {
-      setEtapaAutorizadaMentor(nuevaEtapa);
-
-      if (nuevaEtapa === 2 && esperandoAutorizacionMentor && pasoActual === 2) {
+      if (nuevaEtapa === 2 && esperandoAutorizacionMentor && etapaActual === 1) {
         setEsperandoAutorizacionMentor(false);
-        agregarMensajeAgente('📡 **¡El mentor ha autorizado avanzar a la Etapa 2!** Continuando con la Matriz Frecuencia y Valor...');
-        iniciarEtapa2Matriz();
-      } else if (nuevaEtapa === 3 && esperandoAutorizacionMentor && pasoActual === 3) {
+        setEtapaActual(2);
+        agregarMensajeAgente('📡 **¡El mentor ha autorizado iniciar la Etapa 2!** Evaluaremos ahora la frecuencia de los escenarios y la matriz de tareas...');
+        iniciarEtapa2();
+      } else if (nuevaEtapa === 3 && esperandoAutorizacionMentor && etapaActual === 2) {
         setEsperandoAutorizacionMentor(false);
-        agregarMensajeAgente('📡 **¡El mentor ha autorizado avanzar a la Etapa 3!** Continuando a Flight Levels...');
+        setEtapaActual(3);
+        agregarMensajeAgente('📡 **¡El mentor ha autorizado iniciar la Etapa 3!** Continuando a Flight Levels...');
         iniciarEtapa3FlightLevels();
       }
     });
@@ -92,7 +92,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
     return () => {
       unsubscribe();
     };
-  }, [esperandoAutorizacionMentor, pasoActual]);
+  }, [esperandoAutorizacionMentor, etapaActual]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -104,7 +104,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
       participante_id: 'part-current',
       rol: 'agente',
       texto,
-      paso: pasoActual,
+      paso: etapaActual,
       opciones_chips: opciones
     };
     setMensajes((prev) => [...prev, nuevoMensaje]);
@@ -116,7 +116,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
       participante_id: 'part-current',
       rol: 'participante',
       texto,
-      paso: pasoActual
+      paso: etapaActual
     };
     setMensajes((prev) => [...prev, nuevoMensaje]);
   };
@@ -124,7 +124,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
   const handleEmpezar = () => {
     if (!consentimientoAceptado) return;
     setPasoIniciado(true);
-    setPasoActual(1);
+    setEtapaActual(1);
     const init = getInitialStateForStep(1);
     agregarMensajeAgente(init.agenteMensaje);
   };
@@ -136,9 +136,8 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
 
     setTimeout(() => {
       setIsTyping(false);
-      setPasoActual(2);
       agregarMensajeAgente(
-        `¡Perfecto, ${nombre}! Ficha guardada para ${empresaNombre}.\n\nEtapa 1: Analizaremos dónde se produce la mayor fuga de tiempo o recursos. Te presentaré 4 situaciones cotidianas.`
+        `¡Perfecto, ${nombre}! Ficha guardada para ${empresaNombre}.\n\nEtapa 1 (Puntos de Fuga): Te presentaré 4 situaciones cotidianas para evaluar dónde está la mayor fuga.`
       );
 
       const casosR1 = CASOS_BASE_BALDE.filter((c) => c.ronda === 1);
@@ -149,6 +148,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
     }, 600);
   };
 
+  // ETAPA 1: SELECCIÓN DE CASOS (3 RONDAS)
   const handleSeleccionarCaso = (caseId: string, label: string) => {
     agregarMensajeParticipante(`Elegido: "${label}"`);
 
@@ -188,24 +188,45 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
           );
         }, 500);
       } else {
+        // FIN DE ETAPA 1 (CASOS DE FUGA COMPLETA) -> PAUSA OBLIGATORIA DEL MENTOR!
         setIsTyping(true);
         setTimeout(() => {
           setIsTyping(false);
-          const agujeros: AgujeroType[] = ['Tiempo', 'Procesos', 'Datos', 'Cliente'];
-          const resumen0 = CASOS_RESUMEN_TEXT[agujeros[0]];
           agregarMensajeAgente(
-            `¡Muy bien! Tras revisar estas situaciones, ¿con qué FRECUENCIA se presenta este tipo de escenario en tu empresa?\n\n👉 *"${resumen0}"*`,
-            [
-              { id: 'i1', label: '1 - Nunca', value: 1 },
-              { id: 'i2', label: '2 - Rara vez', value: 2 },
-              { id: 'i3', label: '3 - A veces', value: 3 },
-              { id: 'i4', label: '4 - A menudo', value: 4 },
-              { id: 'i5', label: '5 - Constantemente', value: 5 }
-            ]
+            `🛑 **Excelente, hasta aquí hemos identificado las situaciones clave de fuga de tu empresa.**\n\nTu dispositivo ha quedado en PAUSA. Esperando a que tu mentor autorice el inicio de la Etapa 2 desde el panel principal...`
           );
-        }, 600);
+
+          setEsperandoAutorizacionMentor(true);
+          setEtapaEnPausaTexto('Fin de Etapa 1 - Esperando Autorización del Mentor para Etapa 2');
+
+          if (mockStore.sesion.etapa_autorizada >= 2) {
+            setTimeout(() => {
+              setEsperandoAutorizacionMentor(false);
+              setEtapaActual(2);
+              iniciarEtapa2();
+            }, 800);
+          }
+        }, 700);
       }
     }
+  };
+
+  // INICIO DE ETAPA 2 (AUTORIZADA POR MENTOR)
+  const iniciarEtapa2 = () => {
+    setSubfaseEtapa2('intensidades');
+    const agujeros: AgujeroType[] = ['Tiempo', 'Procesos', 'Datos', 'Cliente'];
+    const resumen0 = CASOS_RESUMEN_TEXT[agujeros[0]];
+
+    agregarMensajeAgente(
+      `Etapa 2 (Intensidad y Matriz de Tareas):\n\nComenzaremos evaluando la FRECUENCIA con la que se presenta en tu empresa este primer escenario:\n\n👉 *"${resumen0}"*`,
+      [
+        { id: 'i1', label: '1 - Nunca', value: 1 },
+        { id: 'i2', label: '2 - Rara vez', value: 2 },
+        { id: 'i3', label: '3 - A veces', value: 3 },
+        { id: 'i4', label: '4 - A menudo', value: 4 },
+        { id: 'i5', label: '5 - Constantemente', value: 5 }
+      ]
+    );
   };
 
   const handleSeleccionarIntensidad = (valor: number, label: string) => {
@@ -226,7 +247,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
       setTimeout(() => {
         setIsTyping(false);
         agregarMensajeAgente(
-          `¿Y con qué frecuencia ocurre este otro escenario en tu empresa?\n\n👉 *"${resumenSig}"*`,
+          `¿Con qué frecuencia ocurre este otro escenario en tu empresa?\n\n👉 *"${resumenSig}"*`,
           [
             { id: 'i1', label: '1 - Nunca', value: 1 },
             { id: 'i2', label: '2 - Rara vez', value: 2 },
@@ -237,79 +258,58 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
         );
       }, 500);
     } else {
-      // END OF ETAPA 1 -> PAUSE & WAIT ONLY FOR MENTOR BROADCAST (NO BYPASS BUTTON FOR PARTICIPANT!)
+      // INTENSIDADES COMPLETAS -> PASAR A PREGUNTAS DE MATRIZ TAREAS (DENTRO DE ETAPA 2)
+      setSubfaseEtapa2('matriz');
       setIsTyping(true);
       setTimeout(() => {
         setIsTyping(false);
         agregarMensajeAgente(
-          `🛑 **Excelente, hasta aquí hemos analizado el principal punto de fuga de tu empresa.**\n\nTu dispositivo ha quedado en PAUSA. Esperando a que tu mentor autorice el paso a la Etapa 2 desde el panel principal...`
+          'Continuamos en la Etapa 2: Evaluaremos tus tareas operativas para clasificarlas en los cuadrantes de la matriz (Oro, Zombi, Cuello de botella, Grasa).'
         );
 
-        setEsperandoAutorizacionMentor(true);
-        setEtapaEnPausaTexto('Pausa Etapa 1 - Esperando Autorización del Mentor para Etapa 2');
+        const tareasIniciales: TareaParticipante[] = [
+          {
+            tarea_id: 'T01',
+            nombre: 'Responder consultas frecuentes de clientes (WhatsApp/email)',
+            area: 'Atención al cliente',
+            nivel: 'N1',
+            frecuencia: 'Diaria',
+            valor: 'El cliente lo nota',
+            horas_semana: 7.5
+          },
+          {
+            tarea_id: 'T03',
+            nombre: 'Registrar y conciliar facturas',
+            area: 'Facturación',
+            nivel: 'N1',
+            frecuencia: 'Varias veces por semana',
+            valor: 'Una molestia interna',
+            horas_semana: 4.0
+          },
+          {
+            tarea_id: 'T06',
+            nombre: 'Seguimiento de clientes y presupuestos enviados',
+            area: 'Ventas',
+            nivel: 'N2',
+            frecuencia: 'Diaria',
+            valor: 'Perdemos una venta o dinero',
+            horas_semana: 5.0
+          }
+        ];
+        setTareasSeleccionadas(tareasIniciales);
 
-        // Check if mentor already authorized
-        if (mockStore.sesion.etapa_autorizada >= 2) {
-          setTimeout(() => {
-            setEsperandoAutorizacionMentor(false);
-            iniciarEtapa2Matriz();
-          }, 1000);
-        }
-      }, 700);
+        agregarMensajeAgente(
+          `Evaluando tarea: **"${tareasIniciales[0].nombre}"**.\n\n¿Con qué FRECUENCIA se realiza?`,
+          [
+            { id: 'f_diaria', label: 'Diaria', value: 'Diaria' },
+            { id: 'f_varias', label: 'Varias veces por semana', value: 'Varias veces por semana' },
+            { id: 'f_semanal', label: 'Semanal', value: 'Semanal' },
+            { id: 'f_mensual', label: 'Mensual', value: 'Mensual' },
+            { id: 'f_ocasional', label: 'Ocasional', value: 'Ocasional' }
+          ]
+        );
+      }, 600);
     }
-  };
-
-  const iniciarEtapa2Matriz = () => {
-    setPasoActual(3);
-    setIsTyping(true);
-    setTimeout(() => {
-      setIsTyping(false);
-      agregarMensajeAgente(
-        'Etapa 2: Matriz Frecuencia y Valor. Evaluaremos tus tareas operativas habituales para clasificarlas en los cuadrantes (Oro, Zombi, Cuello de botella, Grasa).'
-      );
-
-      const tareasIniciales: TareaParticipante[] = [
-        {
-          tarea_id: 'T01',
-          nombre: 'Responder consultas frecuentes de clientes (WhatsApp/email)',
-          area: 'Atención al cliente',
-          nivel: 'N1',
-          frecuencia: 'Diaria',
-          valor: 'El cliente lo nota',
-          horas_semana: 7.5
-        },
-        {
-          tarea_id: 'T03',
-          nombre: 'Registrar y conciliar facturas',
-          area: 'Facturación',
-          nivel: 'N1',
-          frecuencia: 'Varias veces por semana',
-          valor: 'Una molestia interna',
-          horas_semana: 4.0
-        },
-        {
-          tarea_id: 'T06',
-          nombre: 'Seguimiento de clientes y presupuestos enviados',
-          area: 'Ventas',
-          nivel: 'N2',
-          frecuencia: 'Diaria',
-          valor: 'Perdemos una venta o dinero',
-          horas_semana: 5.0
-        }
-      ];
-      setTareasSeleccionadas(tareasIniciales);
-
-      agregarMensajeAgente(
-        `Evaluando tarea: **"${tareasIniciales[0].nombre}"**.\n\n¿Con qué FRECUENCIA se realiza?`,
-        [
-          { id: 'f_diaria', label: 'Diaria', value: 'Diaria' },
-          { id: 'f_varias', label: 'Varias veces por semana', value: 'Varias veces por semana' },
-          { id: 'f_semanal', label: 'Semanal', value: 'Semanal' },
-          { id: 'f_mensual', label: 'Mensual', value: 'Mensual' },
-          { id: 'f_ocasional', label: 'Ocasional', value: 'Ocasional' }
-        ]
-      );
-    }, 700);
   };
 
   const handleRespuestaTareaPaso3 = (valorChoice: string) => {
@@ -376,22 +376,23 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
           );
         }, 500);
       } else {
-        // END OF ETAPA 2 -> PAUSE & WAIT ONLY FOR MENTOR BROADCAST!
+        // FIN DE ETAPA 2 -> PAUSA OBLIGATORIA DEL MENTOR!
         setIsTyping(true);
         setTimeout(() => {
           setIsTyping(false);
           agregarMensajeAgente(
-            `🛑 **Excelente, hemos analizado y clasificado tus actividades operativas en la matriz.**\n\nTu dispositivo está en PAUSA. Esperando a que el mentor autorice el paso a Flight Levels desde el panel principal...`
+            `🛑 **Excelente, hemos analizado y clasificado tus actividades operativas en la matriz.**\n\nTu dispositivo está en PAUSA. Esperando a que el mentor autorice el paso a Flight Levels (Etapa 3) desde el panel principal...`
           );
 
           setEsperandoAutorizacionMentor(true);
-          setEtapaEnPausaTexto('Pausa Etapa 2 - Esperando Autorización del Mentor para Etapa 3');
+          setEtapaEnPausaTexto('Fin de Etapa 2 - Esperando Autorización del Mentor para Etapa 3');
 
           if (mockStore.sesion.etapa_autorizada >= 3) {
             setTimeout(() => {
               setEsperandoAutorizacionMentor(false);
+              setEtapaActual(3);
               iniciarEtapa3FlightLevels();
-            }, 1000);
+            }, 800);
           }
         }, 700);
       }
@@ -399,7 +400,6 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
   };
 
   const iniciarEtapa3FlightLevels = () => {
-    setPasoActual(4);
     setIsTyping(true);
     setTimeout(() => {
       setIsTyping(false);
@@ -528,16 +528,16 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
           </div>
         ) : (
           <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-            {/* Header progress bar */}
+            {/* Progress Bar */}
             <div className="bg-[#2A1545] px-6 py-3 border-b border-white/10 flex items-center justify-between text-white text-xs">
               <div className="flex items-center gap-2 font-semibold">
                 <span className="w-2 h-2 rounded-full bg-[#ED7D31] animate-pulse"></span>
-                <span>Etapa {pasoActual} de 4</span>
+                <span>Etapa {etapaActual} de 3</span>
               </div>
               <div className="w-36 bg-white/20 rounded-full h-2 overflow-hidden">
                 <div
                   className="bg-gradient-to-r from-[#ED7D31] to-[#CCBBEE] h-full transition-all duration-500"
-                  style={{ width: `${(pasoActual / 4) * 100}%` }}
+                  style={{ width: `${(etapaActual / 3) * 100}%` }}
                 ></div>
               </div>
             </div>
@@ -564,15 +564,15 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
                           <button
                             key={chip.id}
                             onClick={() => {
-                              if (pasoActual === 2) {
-                                if (m.texto.includes('FRECUENCIA se presenta') || m.texto.includes('frecuencia ocurre')) {
+                              if (etapaActual === 1) {
+                                handleSeleccionarCaso(String(chip.value), chip.label);
+                              } else if (etapaActual === 2) {
+                                if (subfaseEtapa2 === 'intensidades') {
                                   handleSeleccionarIntensidad(Number(chip.value), chip.label);
                                 } else {
-                                  handleSeleccionarCaso(String(chip.value), chip.label);
+                                  handleRespuestaTareaPaso3(String(chip.value));
                                 }
-                              } else if (pasoActual === 3) {
-                                handleRespuestaTareaPaso3(String(chip.value));
-                              } else if (pasoActual === 4) {
+                              } else if (etapaActual === 3) {
                                 handleRespuestaFlightLevel(Number(chip.value), chip.label);
                               }
                             }}
@@ -588,7 +588,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
                 </div>
               ))}
 
-              {/* STRICT MENTOR REALTIME PAUSE CARD - NO PARTICIPANT BYPASS BUTTON! */}
+              {/* STRICT MENTOR REALTIME PAUSE CARD */}
               {esperandoAutorizacionMentor && (
                 <div className="bg-amber-900/90 text-white border-2 border-amber-400 rounded-2xl p-5 shadow-2xl space-y-3 animate-pulse">
                   <div className="flex items-center gap-2 font-bold text-sm text-amber-200">
@@ -602,7 +602,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
               )}
 
               {/* Paso 1 Form */}
-              {pasoActual === 1 && !confirmacionPaso1 && mensajes.length > 0 && (
+              {etapaActual === 1 && !confirmacionPaso1 && mensajes.length > 0 && (
                 <div className="bg-white rounded-xl p-4 md:p-6 border border-[#CCBBEE] shadow-md space-y-4 my-2">
                   <div className="flex items-center gap-2 font-bold text-[#2A1545] text-sm">
                     <Building2 className="w-4 h-4 text-[#ED7D31]" />
