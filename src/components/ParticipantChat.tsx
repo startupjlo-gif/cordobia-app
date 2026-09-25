@@ -18,14 +18,14 @@ import {
 } from '@/types';
 import {
   CASOS_BASE_BALDE,
+  CASOS_RESUMEN_TEXT,
   PREGUNTAS_FLIGHT_LEVELS,
   getInitialStateForStep
 } from '@/lib/agent-state-machine';
 import { generarDiagnosticoCompleto } from '@/lib/rules-engine';
 import { LocalMockStore } from '@/lib/supabase/mock-store';
-import { promptGeminiAgent } from '@/lib/ai/gemini';
 import { BrandingBanner } from './BrandingBanner';
-import { CheckCircle, Send, ArrowRight, RefreshCw, Lock, Sparkles, Building2, User, Cpu } from 'lucide-react';
+import { CheckCircle, ArrowRight, Lock, Sparkles, Building2 } from 'lucide-react';
 
 interface ParticipantChatProps {
   sessionCode?: string;
@@ -98,7 +98,6 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
     setMensajes((prev) => [...prev, nuevoMensaje]);
   };
 
-  // Start Taller Diagnosis
   const handleEmpezar = () => {
     if (!consentimientoAceptado) return;
     setPasoIniciado(true);
@@ -107,34 +106,30 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
     agregarMensajeAgente(init.agenteMensaje);
   };
 
-  // Paso 1: Confirmation
   const handleConfirmarPaso1 = () => {
     setConfirmacionPaso1(true);
-    agregarMensajeParticipante('✅ Datos de empresa confirmados correctamente.');
+    agregarMensajeParticipante('✅ Datos de empresa confirmados.');
     setIsTyping(true);
 
     setTimeout(() => {
       setIsTyping(false);
       setPasoActual(2);
       agregarMensajeAgente(
-        `¡Perfecto, ${nombre}! Datos guardados para ${empresaNombre}. Pasarás ahora al Paso 2 de 4.\n\nEn este paso identificaremos dónde se produce la mayor fuga de tiempo o recursos. Te mostraré 4 situaciones.`
+        `¡Perfecto, ${nombre}! Ficha guardada para ${empresaNombre}. Avanzamos al Paso 2 de 4.\n\nTe presentaré situaciones cotidianas de negocio. Elige con cuál te sientes más identificado.`
       );
 
-      // Show Round 1 options
       const casosR1 = CASOS_BASE_BALDE.filter((c) => c.ronda === 1);
       agregarMensajeAgente(
-        'Ronda 1 de 3: Elige con cuál de estos 4 casos te sientes MÁS identificado:',
+        'Ronda 1 de 3: Elige la situación con la que MÁS te identificas:',
         casosR1.map((c) => ({ id: c.case_id, label: c.texto_base, value: c.case_id }))
       );
-    }, 800);
+    }, 600);
   };
 
-  // Paso 2: Case Selection Handlers
   const handleSeleccionarCaso = (caseId: string, label: string) => {
     agregarMensajeParticipante(`Elegido: "${label}"`);
 
     if (!primeraEleccionRonda) {
-      // First choice selected
       setPrimeraEleccionRonda(caseId);
       const opcionesRestantes = CASOS_BASE_BALDE.filter(
         (c) => c.ronda === rondaActual && c.case_id !== caseId
@@ -144,19 +139,17 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
       setTimeout(() => {
         setIsTyping(false);
         agregarMensajeAgente(
-          `Entendido. Ahora, en SEGUNDO lugar, ¿con cuál de estas 3 opciones te identificas más?`,
+          `Entendido. Y en SEGUNDO lugar, ¿con cuál de estas 3 opciones te identificas también?`,
           opcionesRestantes
         );
-      }, 600);
+      }, 500);
     } else {
-      // Second choice selected -> Complete Round
       const nuevaEleccion: EleccionCaso = {
         ronda: rondaActual,
         case_id_primera: primeraEleccionRonda,
         case_id_segunda: caseId
       };
-      const nuevasElecciones = [...eleccionesCasos, nuevaEleccion];
-      setEleccionesCasos(nuevasElecciones);
+      setEleccionesCasos([...eleccionesCasos, nuevaEleccion]);
       setPrimeraEleccionRonda(null);
 
       if (rondaActual < 3) {
@@ -167,18 +160,19 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
           setIsTyping(false);
           const casosSiguiente = CASOS_BASE_BALDE.filter((c) => c.ronda === siguienteRonda);
           agregarMensajeAgente(
-            `Ronda ${siguienteRonda} de 3: Elige la opción con la que MÁS te identificas:`,
+            `Ronda ${siguienteRonda} de 3: Elige la situación con la que MÁS te identificas:`,
             casosSiguiente.map((c) => ({ id: c.case_id, label: c.texto_base, value: c.case_id }))
           );
-        }, 600);
+        }, 500);
       } else {
-        // Rounds finished -> Move to Intensity rating per Agujero
+        // All rounds complete -> Ask intensity using TRANSPARENT case summaries (NO internal variable names exposed!)
         setIsTyping(true);
         setTimeout(() => {
           setIsTyping(false);
           const agujeros: AgujeroType[] = ['Tiempo', 'Procesos', 'Datos', 'Cliente'];
+          const resumen0 = CASOS_RESUMEN_TEXT[agujeros[0]];
           agregarMensajeAgente(
-            `¡Muy bien! Ahora dinos con qué frecuencia os pasa algo así en el área de **${agujeros[0]}**:`,
+            `¡Muy bien! Tras revisar estas situaciones, ¿con qué FRECUENCIA se presenta en tu empresa este tipo de escenario?\n\n👉 *"${resumen0}"*`,
             [
               { id: 'i1', label: '1 - Nunca', value: 1 },
               { id: 'i2', label: '2 - Rara vez', value: 2 },
@@ -204,12 +198,13 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
       const siguienteIndex = agujeroIntensidadIndex + 1;
       setAgujeroIntensidadIndex(siguienteIndex);
       const siguienteAgujero = agujeros[siguienteIndex];
+      const resumenSig = CASOS_RESUMEN_TEXT[siguienteAgujero];
 
       setIsTyping(true);
       setTimeout(() => {
         setIsTyping(false);
         agregarMensajeAgente(
-          `¿Con qué frecuencia sucede en el área de **${siguienteAgujero}**?`,
+          `¿Y con qué frecuencia ocurre este otro escenario en tu empresa?\n\n👉 *"${resumenSig}"*`,
           [
             { id: 'i1', label: '1 - Nunca', value: 1 },
             { id: 'i2', label: '2 - Rara vez', value: 2 },
@@ -220,16 +215,15 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
         );
       }, 500);
     } else {
-      // Step 2 finished -> Move to Step 3
+      // Move to Step 3 (Matriz Frecuencia / Valor)
       setIsTyping(true);
       setTimeout(() => {
         setIsTyping(false);
         setPasoActual(3);
         agregarMensajeAgente(
-          'Gracias, seguimos.\n\nPaso 3 de 4: Matriz Frecuencia / Valor. Vamos a analizar las tareas clave de tu empresa.'
+          'Gracias, seguimos.\n\nPaso 3 de 4: Matriz Frecuencia / Valor. Vamos a analizar la recurrencia e impacto de las tareas operativas de tu empresa.'
         );
 
-        // Pre-select 3 standard tasks
         const tareasIniciales: TareaParticipante[] = [
           {
             tarea_id: 'T01',
@@ -262,7 +256,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
         setTareasSeleccionadas(tareasIniciales);
 
         agregarMensajeAgente(
-          `Para la tarea: **${tareasIniciales[0].nombre}**, ¿con qué FRECUENCIA se realiza?`,
+          `Comenzamos evaluando la tarea: **"${tareasIniciales[0].nombre}"**.\n\n¿Con qué FRECUENCIA se realiza?`,
           [
             { id: 'f_diaria', label: 'Diaria', value: 'Diaria' },
             { id: 'f_varias', label: 'Varias veces por semana', value: 'Varias veces por semana' },
@@ -271,11 +265,10 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
             { id: 'f_ocasional', label: 'Ocasional', value: 'Ocasional' }
           ]
         );
-      }, 800);
+      }, 700);
     }
   };
 
-  // Paso 3 Task Attribute Handlers
   const handleRespuestaTareaPaso3 = (valorChoice: string) => {
     agregarMensajeParticipante(valorChoice);
     const tareasCopy = [...tareasSeleccionadas];
@@ -289,7 +282,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
       setTimeout(() => {
         setIsTyping(false);
         agregarMensajeAgente(
-          `Si la tarea **"${tareaActual.nombre}"** sale mal un día, ¿qué ocurre?`,
+          `Si la tarea **"${tareaActual.nombre}"** se retrasa o sale mal un día, ¿qué impacto genera?`,
           [
             { id: 'v1', label: 'No pasa nada', value: 'No pasa nada' },
             { id: 'v2', label: 'Una molestia interna', value: 'Una molestia interna' },
@@ -306,7 +299,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
       setTimeout(() => {
         setIsTyping(false);
         agregarMensajeAgente(
-          `¿Cuántas HORAS por semana aproximadamente insume esa tarea en total en tu equipo?`,
+          `¿Cuántas HORAS semanales aproximadamente consume esa tarea en tu empresa?`,
           [
             { id: 'h1', label: 'Menos de 1h', value: '0.5' },
             { id: 'h2', label: '1 – 3h', value: '2.0' },
@@ -329,7 +322,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
         setTimeout(() => {
           setIsTyping(false);
           agregarMensajeAgente(
-            `Siguiente tarea: **${siguienteTarea.nombre}**. ¿Con qué FRECUENCIA se realiza?`,
+            `Evaluando tarea: **"${siguienteTarea.nombre}"**.\n\n¿Con qué FRECUENCIA se realiza?`,
             [
               { id: 'f_diaria', label: 'Diaria', value: 'Diaria' },
               { id: 'f_varias', label: 'Varias veces por semana', value: 'Varias veces por semana' },
@@ -340,7 +333,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
           );
         }, 500);
       } else {
-        // Step 3 complete -> Move to Step 4
+        // Step 3 finished -> Move to Step 4
         setIsTyping(true);
         setTimeout(() => {
           setIsTyping(false);
@@ -353,12 +346,11 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
             `Pregunta 1/9 (${preg1.nivel} - ${preg1.actividad}):\n${preg1.pregunta}`,
             preg1.opciones.map((o) => ({ id: o.id, label: o.label, value: o.value }))
           );
-        }, 800);
+        }, 700);
       }
     }
   };
 
-  // Paso 4 Flight Levels Handler
   const handleRespuestaFlightLevel = (puntosValue: number, label: string) => {
     agregarMensajeParticipante(label);
     const pregActual = PREGUNTAS_FLIGHT_LEVELS[preguntaIndexFL];
@@ -385,13 +377,11 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
         );
       }, 500);
     } else {
-      // Completed all steps!
       setIsTyping(true);
       setTimeout(() => {
         setIsTyping(false);
         setDiagnosticoFinalizado(true);
 
-        // Run deterministic rules engine
         const resultadoFinal = generarDiagnosticoCompleto(
           { nombre: empresaNombre, sector, num_empleados: numEmpleados, ecosistema, herramientas_desuso: herramientasDesuso },
           eleccionesCasos,
@@ -400,7 +390,6 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
           nuevasRespuestas
         );
 
-        // Save to mock store / local storage
         const partId = `part-${Date.now()}`;
         const empId = `emp-${Date.now()}`;
 
@@ -418,21 +407,18 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
         mockStore.resultados.set(partId, resultadoFinal);
 
         agregarMensajeAgente(
-          `🎉 ¡Gracias, ${nombre}! Hemos terminado satisfactoriamente todos los pasos del diagnóstico.\n\nTu facilitador presentará la tendencia del grupo en vivo en la pantalla principal y te entregará tu informe individual en PDF para **${empresaNombre}**.`
+          `🎉 ¡Excelente, ${nombre}! Has completado todos los pasos del diagnóstico para **${empresaNombre}**.\n\nTu facilitador analizará los resultados consolidados con el grupo y te entregará el diagnóstico individual de tu empresa.`
         );
-      }, 1000);
+      }, 800);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
-      {/* Header Banner */}
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-sans">
       <BrandingBanner />
 
-      {/* Main Container */}
       <div className="flex-1 max-w-3xl w-full mx-auto p-4 flex flex-col">
         {!pasoIniciado ? (
-          /* Welcome Card */
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 md:p-8 my-auto space-y-6">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-[#2A1545] text-white flex items-center justify-center font-bold text-xl shadow-md">
@@ -447,7 +433,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
             </div>
 
             <p className="text-slate-600 text-sm leading-relaxed">
-              Bienvenido al diagnóstico asistido por IA para pymes. Completarás 4 sencillos pasos conversacionales en unos 20-25 minutos para evaluar tus procesos, fugas de tiempo y matriz de madurez digital.
+              Bienvenido al diagnóstico dinámico de transformación digital. En unos 20-25 minutos analizaremos tus situaciones cotidianas de negocio, procesos repetitivos y salud organizativa.
             </p>
 
             <div className="bg-[#CCBBEE]/20 border border-[#CCBBEE]/40 rounded-xl p-4 space-y-3">
@@ -459,7 +445,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
                   className="mt-1 w-4 h-4 text-[#ED7D31] rounded border-slate-300 focus:ring-[#ED7D31]"
                 />
                 <span className="text-xs text-slate-700 font-medium leading-normal">
-                  Acepto el tratamiento de datos para el diagnóstico de transformación digital según la normativa RGPD del programa.
+                  Acepto el tratamiento de datos para el diagnóstico de transformación digital según la política RGPD del taller.
                 </span>
               </label>
             </div>
@@ -478,9 +464,8 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
             </button>
           </div>
         ) : (
-          /* Active Chat Flow */
           <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-            {/* Step Progress Bar Header */}
+            {/* Header progress bar */}
             <div className="bg-[#2A1545] px-6 py-3 border-b border-white/10 flex items-center justify-between text-white text-xs">
               <div className="flex items-center gap-2 font-semibold">
                 <span className="w-2 h-2 rounded-full bg-[#ED7D31] animate-pulse"></span>
@@ -494,7 +479,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
               </div>
             </div>
 
-            {/* Chat Messages Body */}
+            {/* Chat Body */}
             <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50/50">
               {mensajes.map((m) => (
                 <div
@@ -510,7 +495,6 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
                   >
                     <p className="whitespace-pre-line font-normal">{m.texto}</p>
 
-                    {/* Interactive Chip Buttons inside agent message */}
                     {m.opciones_chips && (
                       <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2">
                         {m.opciones_chips.map((chip) => (
@@ -518,7 +502,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
                             key={chip.id}
                             onClick={() => {
                               if (pasoActual === 2) {
-                                if (m.texto.includes('frecuencia os pasa')) {
+                                if (m.texto.includes('FRECUENCIA se presenta') || m.texto.includes('frecuencia ocurre')) {
                                   handleSeleccionarIntensidad(Number(chip.value), chip.label);
                                 } else {
                                   handleSeleccionarCaso(String(chip.value), chip.label);
@@ -541,7 +525,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
                 </div>
               ))}
 
-              {/* Paso 1 Input Card */}
+              {/* Paso 1 Input Form */}
               {pasoActual === 1 && !confirmacionPaso1 && mensajes.length > 0 && (
                 <div className="bg-white rounded-xl p-4 md:p-6 border border-[#CCBBEE] shadow-md space-y-4 my-2">
                   <div className="flex items-center gap-2 font-bold text-[#2A1545] text-sm">
@@ -646,7 +630,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Chat Footer Note */}
+            {/* Footer */}
             <div className="p-3 bg-slate-100 border-t border-slate-200 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
               <Lock className="w-3.5 h-3.5 text-slate-400" />
               <span>

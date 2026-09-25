@@ -1,23 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Empresa, ResultadoDiagnostico } from '@/types';
 import { LocalMockStore } from '@/lib/supabase/mock-store';
 import { generarResumenEjecutivoIA } from '@/lib/ai/gemini';
-import { BrandingBanner } from './BrandingBanner';
 import {
   Printer,
   Edit3,
   Check,
   Sparkles,
-  Download,
-  AlertTriangle,
+  Zap,
+  Building,
   Clock,
   Layers,
-  Wrench,
-  Building2,
-  Calendar,
-  UserCheck
+  Wrench
 } from 'lucide-react';
 
 interface IndividualReportProps {
@@ -28,6 +23,7 @@ export const IndividualReport: React.FC<IndividualReportProps> = ({ empresaId = 
   const mockStore = LocalMockStore.getInstance();
   const empresa = mockStore.empresas.get(empresaId) || mockStore.empresas.values().next().value;
   const resultado = mockStore.resultados.get(`part-1`) || mockStore.resultados.values().next().value;
+  const tareas = mockStore.tareasParticipante.get('part-1') || [];
 
   const [editandoSummary, setEditandoSummary] = useState<boolean>(false);
   const [resumenTexto, setResumenTexto] = useState<string>(
@@ -81,11 +77,11 @@ export const IndividualReport: React.FC<IndividualReportProps> = ({ empresaId = 
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 font-sans p-4 md:p-8">
-      {/* Top Action Toolbar (Hidden during Print) */}
+      {/* Top Action Toolbar */}
       <div className="no-print max-w-4xl mx-auto mb-6 bg-white p-4 rounded-2xl shadow-md border border-slate-200 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-base font-bold text-[#2A1545]">Diagnóstico de Transformación Digital por Empresa</h2>
-          <p className="text-xs text-slate-500">Documento maquetado A4 listo para imprimir o descargar en PDF</p>
+          <p className="text-xs text-slate-500">Documento A4 listo para imprimir o descargar en PDF</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -156,7 +152,7 @@ export const IndividualReport: React.FC<IndividualReportProps> = ({ empresaId = 
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-[#2A1545] flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-[#ED7D31]" />
-                  <span>Resumen Ejecutivo Diagnóstico</span>
+                  <span>Resumen Ejecutivo del Diagnóstico</span>
                 </h3>
                 <button
                   onClick={() => setEditandoSummary(!editandoSummary)}
@@ -263,9 +259,57 @@ export const IndividualReport: React.FC<IndividualReportProps> = ({ empresaId = 
                 </div>
               </div>
             </div>
+
+            {/* Actividades de Mayor Impacto Table */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+              <h4 className="text-xs font-bold text-[#2A1545] border-b pb-2 flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-[#ED7D31]" />
+                <span>Actividades que Más Impactan (Matriz Frecuencia / Valor)</span>
+              </h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-500 uppercase text-[10px] border-b border-slate-200">
+                      <th className="p-2">Tarea / Actividad</th>
+                      <th className="p-2">Área</th>
+                      <th className="p-2">Frecuencia</th>
+                      <th className="p-2">Impacto / Valor</th>
+                      <th className="p-2">Cuadrante</th>
+                      <th className="p-2 text-right">Horas/Sem</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {tareas.map((t, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="p-2 font-semibold text-slate-800">{t.nombre}</td>
+                        <td className="p-2 text-slate-500">{t.area}</td>
+                        <td className="p-2 text-slate-600">{t.frecuencia}</td>
+                        <td className="p-2 text-slate-600">{t.valor}</td>
+                        <td className="p-2">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              t.cuadrante === 'Cuello de botella'
+                                ? 'bg-red-100 text-red-700'
+                                : t.cuadrante === 'Zombi'
+                                ? 'bg-amber-100 text-amber-700'
+                                : t.cuadrante === 'Oro'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {t.cuadrante}
+                          </span>
+                        </td>
+                        <td className="p-2 text-right font-bold text-slate-800">{t.horas_semana}h</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
-          {/* Institutional Co-financing Footer Page 1 */}
+          {/* Footer Page 1 */}
           <div className="border-t border-slate-200 pt-3 flex items-center justify-between text-[10px] text-slate-400 font-medium">
             <span>Cofinanciado por el Fondo Social Europeo Plus (FSE+) y Diputación de Córdoba</span>
             <span>Página 1 de 2</span>
@@ -280,7 +324,6 @@ export const IndividualReport: React.FC<IndividualReportProps> = ({ empresaId = 
               <span className="text-xs text-slate-400 font-medium">{empresa?.nombre}</span>
             </div>
 
-            {/* Total Recoverable Hours Card */}
             <div className="bg-[#ED7D31]/10 border border-[#ED7D31]/30 p-4 rounded-xl flex items-center justify-between mb-6">
               <div>
                 <span className="text-xs text-[#CC6808] font-bold uppercase tracking-wider block">Horas Semanales Recuperables</span>
@@ -369,7 +412,7 @@ export const IndividualReport: React.FC<IndividualReportProps> = ({ empresaId = 
             </div>
           </div>
 
-          {/* Institutional Co-financing Footer Page 2 */}
+          {/* Footer Page 2 */}
           <div className="border-t border-slate-200 pt-3 flex items-center justify-between text-[10px] text-slate-400 font-medium">
             <span>Cofinanciado por el Fondo Social Europeo Plus (FSE+) y Diputación de Córdoba</span>
             <span>Página 2 de 2</span>

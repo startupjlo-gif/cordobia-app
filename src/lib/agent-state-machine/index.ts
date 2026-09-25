@@ -1,4 +1,4 @@
-import { Caso, ChipOption, NivelFlight, SectorType } from '@/types';
+import { Caso, ChipOption, NivelFlight } from '@/types';
 
 export interface QuestionState {
   step: number;
@@ -14,96 +14,96 @@ export const PREGUNTAS_FLIGHT_LEVELS = [
     id: 'F1',
     nivel: 'N1' as NivelFlight,
     actividad: 'Visibilidad',
-    pregunta: 'Si mañana falta tu persona clave de ventas (o de atención al cliente), ¿dónde está la información de lo que prometió a sus clientes?',
+    pregunta: 'Si mañana falta tu persona clave de ventas (o atención al cliente), ¿dónde está lo que prometió a sus clientes?',
     opciones: [
-      { id: 'f1_0', label: 'En su cabeza o su WhatsApp privado', value: 0 },
-      { id: 'f1_1', label: 'En su Excel personal o cuaderno', value: 1 },
+      { id: 'f1_0', label: 'En su cabeza o su WhatsApp', value: 0 },
+      { id: 'f1_1', label: 'En su Excel o cuaderno', value: 1 },
       { id: 'f1_2', label: 'En una herramienta compartida pero incompleta', value: 2 },
-      { id: 'f1_3', label: 'En un sistema compartido y al día por todo el equipo', value: 3 },
+      { id: 'f1_3', label: 'En un sistema compartido y al día', value: 3 },
     ]
   },
   {
     id: 'F2',
     nivel: 'N1' as NivelFlight,
     actividad: 'Coordinación',
-    pregunta: '¿Cómo sabe cada persona de la empresa lo que tiene que hacer hoy?',
+    pregunta: '¿Cómo sabe cada persona qué tiene que hacer hoy?',
     opciones: [
-      { id: 'f2_0', label: 'Se lo digo yo sobre la marcha o improvisa', value: 0 },
-      { id: 'f2_1', label: 'Cada uno lo lleva en su cabeza o su libreta', value: 1 },
+      { id: 'f2_0', label: 'Se lo digo yo o lo improvisa', value: 0 },
+      { id: 'f2_1', label: 'Cada uno lo lleva en su cabeza o libreta', value: 1 },
       { id: 'f2_2', label: 'Lista compartida, a veces desactualizada', value: 2 },
-      { id: 'f2_3', label: 'Tablero compartido que todos actualizan en tiempo real', value: 3 },
+      { id: 'f2_3', label: 'Tablero compartido que todos actualizan', value: 3 },
     ]
   },
   {
     id: 'F3',
     nivel: 'N1' as NivelFlight,
     actividad: 'Medición',
-    pregunta: '¿Sabéis cuánto tiempo os llevan las tareas repetitivas día a día?',
+    pregunta: '¿Sabéis cuánto tiempo os llevan las tareas repetitivas?',
     opciones: [
-      { id: 'f3_0', label: 'Ni idea, se hace sin medir', value: 0 },
-      { id: 'f3_1', label: 'Por intuición u ojímetro', value: 1 },
-      { id: 'f3_2', label: 'Lo medimos alguna vez puntual', value: 2 },
-      { id: 'f3_3', label: 'Lo medimos habitualmente con datos', value: 3 },
+      { id: 'f3_0', label: 'Ni idea', value: 0 },
+      { id: 'f3_1', label: 'Por intuición', value: 1 },
+      { id: 'f3_2', label: 'Lo medimos alguna vez', value: 2 },
+      { id: 'f3_3', label: 'Lo medimos habitualmente', value: 3 },
     ]
   },
   {
     id: 'F4',
     nivel: 'N2' as NivelFlight,
     actividad: 'Visibilidad',
-    pregunta: '¿Puedes ver en un solo lugar en qué punto está cada pedido o servicio, desde que se vende hasta que se cobra?',
+    pregunta: '¿Puedes ver en un solo lugar en qué punto está cada pedido, desde que se vende hasta que se cobra?',
     opciones: [
       { id: 'f4_0', label: 'No, hay que preguntar a cada persona', value: 0 },
-      { id: 'f4_1', label: 'Hay que mirar en varios sitios o archivos', value: 1 },
-      { id: 'f4_2', label: 'En un lugar central, pero no siempre al día', value: 2 },
-      { id: 'f4_3', label: 'Sí, en tiempo real en un panel único', value: 3 },
+      { id: 'f4_1', label: 'Hay que mirar en varios sitios', value: 1 },
+      { id: 'f4_2', label: 'En un lugar, pero no siempre actualizado', value: 2 },
+      { id: 'f4_3', label: 'Sí, en tiempo real', value: 3 },
     ]
   },
   {
     id: 'F5',
     nivel: 'N2' as NivelFlight,
     actividad: 'Coordinación',
-    pregunta: 'Cuando se cierra una venta o solicitud, ¿cómo se entera quien tiene que prepararla o ejecutarla?',
+    pregunta: 'Cuando se cierra una venta, ¿cómo se entera quien tiene que prepararla o fabricarla?',
     opciones: [
       { id: 'f5_0', label: 'De palabra o cuando alguien se acuerda', value: 0 },
-      { id: 'f5_1', label: 'Por un WhatsApp o email suelto', value: 1 },
-      { id: 'f5_2', label: 'Por una plantilla o hoja compartida', value: 2 },
-      { id: 'f5_3', label: 'El flujo o pedido pasa solo por el sistema', value: 3 },
+      { id: 'f5_1', label: 'Por WhatsApp o email', value: 1 },
+      { id: 'f5_2', label: 'Por una hoja compartida', value: 2 },
+      { id: 'f5_3', label: 'El pedido pasa solo por el sistema', value: 3 },
     ]
   },
   {
     id: 'F6',
     nivel: 'N2' as NivelFlight,
     actividad: 'Medición',
-    pregunta: '¿Sabes cuántos días pasan exactos desde que el cliente dice "sí" hasta que cobras la factura?',
+    pregunta: '¿Sabes cuántos días pasan desde que el cliente dice sí hasta que cobras?',
     opciones: [
-      { id: 'f6_0', label: 'No lo sé', value: 0 },
-      { id: 'f6_1', label: 'Aproximadamente, sin dato exacto', value: 1 },
+      { id: 'f6_0', label: 'No', value: 0 },
+      { id: 'f6_1', label: 'Aproximadamente', value: 1 },
       { id: 'f6_2', label: 'Sí, lo calculo de vez en cuando', value: 2 },
-      { id: 'f6_3', label: 'Lo veo siempre en un indicador automático', value: 3 },
+      { id: 'f6_3', label: 'Lo veo siempre en un indicador', value: 3 },
     ]
   },
   {
     id: 'F7',
     nivel: 'N3' as NivelFlight,
     actividad: 'Visibilidad',
-    pregunta: '¿Cuántos proyectos de mejora o iniciativas nuevas tenéis abiertas a la vez en la empresa?',
+    pregunta: '¿Cuántos proyectos de mejora o iniciativas nuevas tenéis abiertos a la vez?',
     opciones: [
-      { id: 'f7_0', label: 'No lo sé o muchísimos sin terminar', value: 0 },
-      { id: 'f7_1', label: 'Más de 5 proyectos simultáneos', value: 1 },
-      { id: 'f7_2', label: 'Entre 3 y 5 proyectos', value: 2 },
-      { id: 'f7_3', label: '1 o 2, con prioridad clara y enfocados', value: 3 },
+      { id: 'f7_0', label: 'No lo sé o muchos sin terminar', value: 0 },
+      { id: 'f7_1', label: 'Más de 5', value: 1 },
+      { id: 'f7_2', label: 'Entre 3 y 5', value: 2 },
+      { id: 'f7_3', label: '1 o 2, con prioridad clara', value: 3 },
     ]
   },
   {
     id: 'F8',
     nivel: 'N3' as NivelFlight,
     actividad: 'Coordinación',
-    pregunta: '¿Cada cuánto revisáis en equipo si se están cumpliendo los objetivos del negocio?',
+    pregunta: '¿Cada cuánto revisáis en equipo si se cumplen los objetivos del negocio?',
     opciones: [
-      { id: 'f8_0', label: 'Nunca o casi nunca', value: 0 },
-      { id: 'f8_1', label: 'Una vez al año al cerrar ejercicio', value: 1 },
+      { id: 'f8_0', label: 'Nunca', value: 0 },
+      { id: 'f8_1', label: 'Una vez al año', value: 1 },
       { id: 'f8_2', label: 'Cada trimestre', value: 2 },
-      { id: 'f8_3', label: 'Cada mes o más a menudo con datos', value: 3 },
+      { id: 'f8_3', label: 'Cada mes o más a menudo', value: 3 },
     ]
   },
   {
@@ -112,10 +112,10 @@ export const PREGUNTAS_FLIGHT_LEVELS = [
     actividad: 'Medición',
     pregunta: '¿Con qué información decidiste tu última inversión o contratación importante?',
     opciones: [
-      { id: 'f9_0', label: 'Por pura intuición o corazonada', value: 0 },
-      { id: 'f9_1', label: 'Con lo que dijo el gestor al cierre de año', value: 1 },
-      { id: 'f9_2', label: 'Con un informe mensual acumulado', value: 2 },
-      { id: 'f9_3', label: 'Con un panel actualizado con números claros', value: 3 },
+      { id: 'f9_0', label: 'Intuición', value: 0 },
+      { id: 'f9_1', label: 'Lo que dijo el gestor al cierre', value: 1 },
+      { id: 'f9_2', label: 'Un informe mensual', value: 2 },
+      { id: 'f9_3', label: 'Un panel actualizado', value: 3 },
     ]
   }
 ];
@@ -135,12 +135,20 @@ export const CASOS_BASE_BALDE: Caso[] = [
   { case_id: 'R3_C', ronda: 3, agujero: 'Cliente', texto_base: 'No sé qué clientes me dejan más margen ni cuáles han dejado de comprarme.' }
 ];
 
+// Resúmenes transparentes de los casos para preguntar por su intensidad sin revelar variables
+export const CASOS_RESUMEN_TEXT: Record<string, string> = {
+  Tiempo: 'Tareas manuales y administrativas que consumen el día (copiar datos, contestar WhatsApps, papeleo)',
+  Procesos: 'Dependencia personal extrema y falta de procedimientos escritos o estandarizados',
+  Datos: 'Falta de visibilidad sobre números reales, márgenes, ganancias o stock en tiempo real',
+  Cliente: 'Falta de seguimiento a presupuestos, oportunidades comerciales y comportamiento de clientes'
+};
+
 export function getInitialStateForStep(step: number): QuestionState {
   if (step === 1) {
     return {
       step: 1,
       preguntaId: 'P1_NOMBRE_EMPRESA',
-      agenteMensaje: '¡Hola! Soy tu asistente para este diagnóstico de transformación digital en Córdoba IA. Para empezar, ¿cómo te llamas y a qué se dedica tu empresa?',
+      agenteMensaje: '¡Hola! Soy tu asistente para este diagnóstico de transformación digital. Para comenzar, ¿cómo te llamas y a qué se dedica tu empresa?',
       inputType: 'text'
     };
   }
@@ -148,7 +156,7 @@ export function getInitialStateForStep(step: number): QuestionState {
     return {
       step: 2,
       preguntaId: 'P2_RONDA1_PRIMERA',
-      agenteMensaje: 'Paso 2: Vamos a analizar dónde se pierde energía en tu empresa. Te mostraré 4 situaciones reales. Elige con cuál te sientes MÁS identificado:',
+      agenteMensaje: 'Paso 2: A continuación te presento 4 situaciones reales de negocio. Elige la situación con la que MÁS te identificas en tu día a día:',
       inputType: 'chips',
       chipOptions: CASOS_BASE_BALDE.filter(c => c.ronda === 1).map(c => ({
         id: c.case_id,
@@ -161,7 +169,7 @@ export function getInitialStateForStep(step: number): QuestionState {
     return {
       step: 3,
       preguntaId: 'P3_SELECCION_TAREAS',
-      agenteMensaje: 'Paso 3: Matriz Frecuencia / Valor. Selecciona de esta lista las tareas habituales que se realizan en tu empresa (mínimo 3, máximo 8):',
+      agenteMensaje: 'Paso 3: Matriz Frecuencia / Valor. Selecciona de esta lista las tareas operativas habituales que se realizan en tu empresa:',
       inputType: 'multi_select_tasks',
       isMultiSelect: true
     };
@@ -169,7 +177,7 @@ export function getInitialStateForStep(step: number): QuestionState {
   return {
     step: 4,
     preguntaId: 'F1',
-    agenteMensaje: `Paso 4: Evaluación Flight Levels. Vamos con 9 preguntas rápidas sobre cómo os organizáis. 1ª pregunta:\n\n${PREGUNTAS_FLIGHT_LEVELS[0].pregunta}`,
+    agenteMensaje: `Paso 4: Evaluación Flight Levels (Salud Organizativa). 1ª pregunta:\n\n${PREGUNTAS_FLIGHT_LEVELS[0].pregunta}`,
     inputType: 'chips',
     chipOptions: PREGUNTAS_FLIGHT_LEVELS[0].opciones.map(o => ({
       id: o.id,
