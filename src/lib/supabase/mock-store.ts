@@ -9,7 +9,6 @@ import {
 } from '@/types';
 import { CATALOGO_HERRAMIENTAS, generarDiagnosticoCompleto } from '@/lib/rules-engine';
 
-// In-Memory state store for local preview / offline support
 export class LocalMockStore {
   private static instance: LocalMockStore;
 
@@ -22,6 +21,7 @@ export class LocalMockStore {
     titulo_bienvenida: 'Transformando nuestro modelo de negocio – Córdoba IA',
     subtitulo_bienvenida: 'Un diagnóstico guiado de unos 25 minutos',
     texto_consentimiento: 'Doy mi consentimiento para el tratamiento de datos según la política RGPD del taller.',
+    etapa_autorizada: 1, // Default initial stage authorized by mentor
     revelado_bloques: { b1: true, b2: true, b3: true, b4: true, b5: true, b6: true, b7: false }
   };
 
@@ -31,6 +31,8 @@ export class LocalMockStore {
   public resultados: Map<string, ResultadoDiagnostico> = new Map();
   public informes: Map<string, InformeEmpresa> = new Map();
   public tareasParticipante: Map<string, TareaParticipante[]> = new Map();
+
+  private listenersEtapa: Set<(nuevaEtapa: number) => void> = new Set();
 
   private constructor() {
     this.seedMockData();
@@ -43,8 +45,18 @@ export class LocalMockStore {
     return LocalMockStore.instance;
   }
 
+  // Facilitator Master Control Action: Broadcasts stage advance to all active devices
+  public autorizarEtapaFacilitador(nuevaEtapa: number) {
+    this.sesion.etapa_autorizada = nuevaEtapa;
+    this.listenersEtapa.forEach((listener) => listener(nuevaEtapa));
+  }
+
+  public onEtapaCambiada(callback: (nuevaEtapa: number) => void) {
+    this.listenersEtapa.add(callback);
+    return () => this.listenersEtapa.delete(callback);
+  }
+
   private seedMockData() {
-    // Seed 4 demo companies & participants for live dashboard demonstration
     const demoCompanies: Empresa[] = [
       {
         id: 'emp-1',
@@ -99,7 +111,6 @@ export class LocalMockStore {
       };
       this.participantes.set(partId, part);
 
-      // Tasks for demo company
       const demoTasks: TareaParticipante[] = [
         {
           tarea_id: 'T01',
@@ -134,7 +145,6 @@ export class LocalMockStore {
       ];
       this.tareasParticipante.set(partId, demoTasks);
 
-      // Results using rules engine
       const res = generarDiagnosticoCompleto(
         emp,
         [
@@ -166,7 +176,6 @@ export class LocalMockStore {
       res.empresa_id = emp.id;
       this.resultados.set(partId, res);
 
-      // Report
       this.informes.set(emp.id, {
         empresa_id: emp.id,
         resumen_ejecutivo: `La empresa ${emp.nombre} presenta un diagnóstico centrado en su coordinación operativa (Nivel 2). La fuga principal identificada radica en ${res.agujero_principal}, requiriendo sistematización inmediata.`,

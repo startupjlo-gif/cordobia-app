@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Empresa, ResultadoDiagnostico } from '@/types';
 import { LocalMockStore } from '@/lib/supabase/mock-store';
 import { BrandingBanner } from './BrandingBanner';
 import {
@@ -19,7 +18,9 @@ import {
   Building,
   ExternalLink,
   Zap,
-  TrendingUp
+  Play,
+  CheckCircle,
+  Radio
 } from 'lucide-react';
 
 interface GroupDashboardProps {
@@ -29,6 +30,7 @@ interface GroupDashboardProps {
 export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => {
   const [sectorFiltro, setSectorFiltro] = useState<string>('Todos');
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
+  const [etapaAutorizada, setEtapaAutorizada] = useState<number>(1);
   const [revelados, setRevelados] = useState<Record<string, boolean>>({
     b1: true,
     b2: true,
@@ -36,15 +38,22 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
     b4: true,
     b5: true,
     b6: true,
-    b7: false,
-    b8: true // Detalle por Empresa
+    b7: false
   });
 
   const mockStore = LocalMockStore.getInstance();
   const resultadosArray = Array.from(mockStore.resultados.values());
   const empresasMap = mockStore.empresas;
 
-  // Filtered dataset
+  useEffect(() => {
+    setEtapaAutorizada(mockStore.sesion.etapa_autorizada || 1);
+  }, []);
+
+  const handleAutorizarEtapa = (nuevaEtapa: number) => {
+    mockStore.autorizarEtapaFacilitador(nuevaEtapa);
+    setEtapaAutorizada(nuevaEtapa);
+  };
+
   const resultadosFiltrados = resultadosArray.filter((r) => {
     if (sectorFiltro === 'Todos') return true;
     const emp = empresasMap.get(r.empresa_id);
@@ -54,22 +63,18 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
   const numEmpresas = resultadosFiltrados.length;
   const esAnonimoInsuficiente = numEmpresas < 3 && sectorFiltro !== 'Todos';
 
-  // Calculations for Block 2: Balde
   const avgTiempo = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + b.fuga_tiempo, 0) / numEmpresas) : 0;
   const avgProcesos = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + b.fuga_procesos, 0) / numEmpresas) : 0;
   const avgDatos = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + b.fuga_datos, 0) / numEmpresas) : 0;
   const avgCliente = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + b.fuga_cliente, 0) / numEmpresas) : 0;
 
-  // Calculations for Block 4: Horas
   const totalHoras = resultadosFiltrados.reduce((a, b) => a + b.horas_recuperables, 0);
   const avgHoras = numEmpresas > 0 ? (totalHoras / numEmpresas).toFixed(1) : '0.0';
 
-  // Calculations for Block 5: Flight Levels
   const avgN1 = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + b.salud_n1, 0) / numEmpresas) : 0;
   const avgN2 = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + b.salud_n2, 0) / numEmpresas) : 0;
   const avgN3 = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + b.salud_n3, 0) / numEmpresas) : 0;
 
-  // Calculations for Block 6: Semáforo
   const numRojo = resultadosFiltrados.filter((r) => r.semaforo === 'rojo').length;
   const numAmarillo = resultadosFiltrados.filter((r) => r.semaforo === 'amarillo').length;
   const numVerde = resultadosFiltrados.filter((r) => r.semaforo === 'verde').length;
@@ -95,6 +100,61 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
       {!isFullScreen && <BrandingBanner />}
 
       <div className="max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6 flex-1 flex flex-col">
+        {/* FACILITATOR MASTER REALTIME CONTROL PANEL */}
+        <div className="bg-gradient-to-r from-[#2A1545] to-[#43236b] border-2 border-[#CCBBEE]/40 rounded-2xl p-4 md:p-5 shadow-2xl space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-white font-bold text-sm md:text-base">
+              <Radio className="w-5 h-5 text-[#ED7D31] animate-ping" />
+              <span>Control Maestro del Facilitador (Difusión en Tiempo Real)</span>
+            </div>
+            <span className="text-xs bg-[#ED7D31] text-white font-bold px-2.5 py-0.5 rounded-full">
+              Sincronizado con Dispositivos Móviles
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-200">
+            Al pulsar cualquiera de los botones de autorización, la pantalla de **todos los móviles conectados en la sala** se desbloqueará instantáneamente para avanzar a la siguiente etapa.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+            <button
+              onClick={() => handleAutorizarEtapa(1)}
+              className={`p-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border transition-all cursor-pointer ${
+                etapaAutorizada === 1
+                  ? 'bg-[#ED7D31] text-white border-white shadow-lg'
+                  : 'bg-white/10 hover:bg-white/20 text-slate-200 border-white/20'
+              }`}
+            >
+              <CheckCircle className="w-4 h-4" />
+              <span>Etapa 1: Puntos de Fuga (Activa)</span>
+            </button>
+
+            <button
+              onClick={() => handleAutorizarEtapa(2)}
+              className={`p-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border transition-all cursor-pointer ${
+                etapaAutorizada === 2
+                  ? 'bg-[#ED7D31] text-white border-white shadow-lg'
+                  : 'bg-white/10 hover:bg-white/20 text-slate-200 border-white/20'
+              }`}
+            >
+              <Play className="w-4 h-4 text-emerald-400" />
+              <span>🔓 Autorizar Etapa 2 (Matriz Tareas)</span>
+            </button>
+
+            <button
+              onClick={() => handleAutorizarEtapa(3)}
+              className={`p-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border transition-all cursor-pointer ${
+                etapaAutorizada === 3
+                  ? 'bg-[#ED7D31] text-white border-white shadow-lg'
+                  : 'bg-white/10 hover:bg-white/20 text-slate-200 border-white/20'
+              }`}
+            >
+              <Play className="w-4 h-4 text-emerald-400" />
+              <span>🔓 Autorizar Etapa 3 (Flight Levels)</span>
+            </button>
+          </div>
+        </div>
+
         {/* Controls Bar */}
         <div className="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-lg">
           <div className="flex items-center gap-3">
@@ -103,7 +163,7 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
             </div>
             <div>
               <h2 className="text-lg font-bold text-white">Dashboard del Grupo (Proyectable)</h2>
-              <p className="text-xs text-slate-400">Córdoba IA – Grupo 1 · Análisis Consolidado y Detalle de Madurez</p>
+              <p className="text-xs text-slate-400">Córdoba IA – Grupo 1 · Resultados Consolidados</p>
             </div>
           </div>
 
@@ -143,7 +203,6 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
           </div>
         ) : (
           <div className="space-y-6">
-            {/* 6 Metric Blocks Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Bloque 1: Avance */}
               <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
@@ -179,7 +238,7 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
                 )}
               </div>
 
-              {/* Bloque 2: Balde del Grupo */}
+              {/* Bloque 2: Balde */}
               <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
                 <div className="flex items-center justify-between border-b border-slate-700/60 pb-3 mb-4">
                   <div className="flex items-center gap-2 font-bold text-slate-200 text-sm">
@@ -316,7 +375,7 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
                 )}
               </div>
 
-              {/* Matriz 2x2 Resumen de Cuadrantes */}
+              {/* Bloque 3: Matriz Resumen */}
               <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
                 <div className="flex items-center justify-between border-b border-slate-700/60 pb-3 mb-4">
                   <div className="flex items-center gap-2 font-bold text-slate-200 text-sm">
@@ -345,7 +404,7 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
               </div>
             </div>
 
-            {/* DETALLE POR EMPRESA (TABLE DETALLE FACILITADOR) */}
+            {/* DETALLE POR EMPRESA TABLE */}
             <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl space-y-4">
               <div className="flex items-center justify-between border-b border-slate-700 pb-3">
                 <div className="flex items-center gap-2 font-bold text-white text-base">
@@ -420,7 +479,6 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
               </div>
             </div>
 
-            {/* Bloque 7: Alertas Coherencia */}
             {!isFullScreen && (
               <div className="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5 shadow-lg">
                 <div className="flex items-center gap-2 font-bold text-amber-400 text-xs mb-3">

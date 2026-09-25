@@ -22,7 +22,7 @@ import {
 import { generarDiagnosticoCompleto } from '@/lib/rules-engine';
 import { LocalMockStore } from '@/lib/supabase/mock-store';
 import { BrandingBanner } from './BrandingBanner';
-import { CheckCircle, ArrowRight, Lock, Sparkles, Building2, PauseCircle, PlayCircle } from 'lucide-react';
+import { CheckCircle, ArrowRight, Lock, Sparkles, Building2, Radio } from 'lucide-react';
 
 interface ParticipantChatProps {
   sessionCode?: string;
@@ -37,6 +37,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
   // Mentor Pause States
   const [esperandoAutorizacionMentor, setEsperandoAutorizacionMentor] = useState<boolean>(false);
   const [etapaEnPausaTexto, setEtapaEnPausaTexto] = useState<string>('');
+  const [etapaAutorizadaMentor, setEtapaAutorizadaMentor] = useState<number>(1);
 
   // Paso 1 Form state
   const [nombre, setNombre] = useState<string>('');
@@ -71,6 +72,27 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const mockStore = LocalMockStore.getInstance();
+
+  // REALTIME LISTEN TO FACILITATOR STAGE AUTHORIZATION BROADCAST
+  useEffect(() => {
+    const unsubscribe = mockStore.onEtapaCambiada((nuevaEtapa) => {
+      setEtapaAutorizadaMentor(nuevaEtapa);
+
+      if (nuevaEtapa === 2 && esperandoAutorizacionMentor && pasoActual === 2) {
+        setEsperandoAutorizacionMentor(false);
+        agregarMensajeAgente('📡 **¡El mentor ha autorizado avanzar a la Etapa 2!** Continuando con la Matriz Frecuencia y Valor...');
+        iniciarEtapa2Matriz();
+      } else if (nuevaEtapa === 3 && esperandoAutorizacionMentor && pasoActual === 3) {
+        setEsperandoAutorizacionMentor(false);
+        agregarMensajeAgente('📡 **¡El mentor ha autorizado avanzar a la Etapa 3!** Continuando a Flight Levels...');
+        iniciarEtapa3FlightLevels();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [esperandoAutorizacionMentor, pasoActual]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -215,26 +237,30 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
         );
       }, 500);
     } else {
-      // END OF ETAPA 1 (LEAKS) -> PAUSE & WAIT FOR MENTOR PERMISSION!
+      // END OF ETAPA 1 -> PAUSE & WAIT ONLY FOR MENTOR BROADCAST (NO BYPASS BUTTON FOR PARTICIPANT!)
       setIsTyping(true);
       setTimeout(() => {
         setIsTyping(false);
         agregarMensajeAgente(
-          `🛑 **Excelente, hasta aquí hemos identificado el principal punto de fuga de tu empresa.**\n\nVamos a hacer una breve pausa para revisar este punto con tu mentor antes de pasar a clasificar tus tareas en los cuadrantes de la matriz.`
+          `🛑 **Excelente, hasta aquí hemos analizado el principal punto de fuga de tu empresa.**\n\nTu dispositivo ha quedado en PAUSA. Esperando a que tu mentor autorice el paso a la Etapa 2 desde el panel principal...`
         );
 
         setEsperandoAutorizacionMentor(true);
-        setEtapaEnPausaTexto('Etapa 1 Completada (Punto de Fuga Identificado)');
+        setEtapaEnPausaTexto('Pausa Etapa 1 - Esperando Autorización del Mentor para Etapa 2');
+
+        // Check if mentor already authorized
+        if (mockStore.sesion.etapa_autorizada >= 2) {
+          setTimeout(() => {
+            setEsperandoAutorizacionMentor(false);
+            iniciarEtapa2Matriz();
+          }, 1000);
+        }
       }, 700);
     }
   };
 
-  // Mentor Continuation Handler (Etapa 1 -> Etapa 2)
-  const handleContinuarMentorEtapa2 = () => {
-    setEsperandoAutorizacionMentor(false);
-    agregarMensajeParticipante('▶️ Autorización del mentor confirmada. Continuando...');
+  const iniciarEtapa2Matriz = () => {
     setPasoActual(3);
-
     setIsTyping(true);
     setTimeout(() => {
       setIsTyping(false);
@@ -350,27 +376,30 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
           );
         }, 500);
       } else {
-        // END OF ETAPA 2 (MATRIZ TAREAS) -> PAUSE & WAIT FOR MENTOR PERMISSION!
+        // END OF ETAPA 2 -> PAUSE & WAIT ONLY FOR MENTOR BROADCAST!
         setIsTyping(true);
         setTimeout(() => {
           setIsTyping(false);
           agregarMensajeAgente(
-            `🛑 **Excelente, hemos analizado y clasificado tus actividades operativas en la matriz.**\n\nIdentificamos el potencial de automatización (tareas Zombi) y los Cuellos de Botella principales. Esperamos la orden de tu mentor para iniciar la etapa de Flight Levels (Salud Organizativa).`
+            `🛑 **Excelente, hemos analizado y clasificado tus actividades operativas en la matriz.**\n\nTu dispositivo está en PAUSA. Esperando a que el mentor autorice el paso a Flight Levels desde el panel principal...`
           );
 
           setEsperandoAutorizacionMentor(true);
-          setEtapaEnPausaTexto('Etapa 2 Completada (Matriz Frecuencia / Valor)');
+          setEtapaEnPausaTexto('Pausa Etapa 2 - Esperando Autorización del Mentor para Etapa 3');
+
+          if (mockStore.sesion.etapa_autorizada >= 3) {
+            setTimeout(() => {
+              setEsperandoAutorizacionMentor(false);
+              iniciarEtapa3FlightLevels();
+            }, 1000);
+          }
         }, 700);
       }
     }
   };
 
-  // Mentor Continuation Handler (Etapa 2 -> Etapa 3 Flight Levels)
-  const handleContinuarMentorEtapa3 = () => {
-    setEsperandoAutorizacionMentor(false);
-    agregarMensajeParticipante('▶️ Autorización del mentor confirmada. Continuando a Flight Levels...');
+  const iniciarEtapa3FlightLevels = () => {
     setPasoActual(4);
-
     setIsTyping(true);
     setTimeout(() => {
       setIsTyping(false);
@@ -467,7 +496,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
             </div>
 
             <p className="text-slate-600 text-sm leading-relaxed">
-              Bienvenido al diagnóstico dinámico con pausas asistidas por tu mentor. Evaluaremos tus situaciones cotidianas, actividades operativas y salud organizativa por etapas.
+              Bienvenido al diagnóstico dinámico controlado por tu mentor. Evaluaremos tus situaciones cotidianas, actividades operativas y salud organizativa por etapas sincronizadas.
             </p>
 
             <div className="bg-[#CCBBEE]/20 border border-[#CCBBEE]/40 rounded-xl p-4 space-y-3">
@@ -559,23 +588,16 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
                 </div>
               ))}
 
-              {/* MENTOR PAUSE CARD */}
+              {/* STRICT MENTOR REALTIME PAUSE CARD - NO PARTICIPANT BYPASS BUTTON! */}
               {esperandoAutorizacionMentor && (
-                <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 shadow-lg space-y-3 animate-pulse">
-                  <div className="flex items-center gap-2 text-amber-800 font-bold text-sm">
-                    <PauseCircle className="w-5 h-5 text-amber-600" />
+                <div className="bg-amber-900/90 text-white border-2 border-amber-400 rounded-2xl p-5 shadow-2xl space-y-3 animate-pulse">
+                  <div className="flex items-center gap-2 font-bold text-sm text-amber-200">
+                    <Radio className="w-5 h-5 text-[#ED7D31] animate-spin" />
                     <span>{etapaEnPausaTexto}</span>
                   </div>
-                  <p className="text-xs text-amber-900 leading-relaxed">
-                    El asistente ha pausado el avance. En este momento tu mentor explicará los hallazgos en la pantalla principal antes de iniciar la siguiente etapa.
+                  <p className="text-xs text-amber-100/90 leading-relaxed font-medium">
+                    🔒 **Dispositivo en Pausa Controlada.** En este momento tu mentor está explicando las tendencias en la pantalla principal. Cuando el mentor pulse *"Autorizar"* en su panel, tu pantalla avanzará automáticamente.
                   </p>
-                  <button
-                    onClick={pasoActual === 2 ? handleContinuarMentorEtapa2 : handleContinuarMentorEtapa3}
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-[#2A1545] to-[#43236b] hover:from-[#371b5c] hover:to-[#2A1545] text-white font-bold text-xs shadow flex items-center justify-center gap-2 cursor-pointer transition-all"
-                  >
-                    <PlayCircle className="w-4 h-4 text-[#ED7D31]" />
-                    <span>El Mentor ha Autorizado Continuar</span>
-                  </button>
                 </div>
               )}
 

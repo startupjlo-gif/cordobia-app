@@ -25,6 +25,7 @@ export interface Sesion {
   titulo_bienvenida: string;
   subtitulo_bienvenida: string;
   texto_consentimiento: string;
+  etapa_autorizada: number; // 1, 2, 3, 4 (Controlled ONLY by Facilitator!)
   logos_url?: string[];
   revelado_bloques: Record<string, boolean>;
 }
