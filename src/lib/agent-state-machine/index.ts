@@ -136,13 +136,6 @@ export const CASOS_BASE_BALDE: Caso[] = [
   { case_id: 'R3_C', ronda: 3, agujero: 'Cliente', texto_base: 'No sé qué clientes me dejan más margen ni cuáles han dejado de comprarme.' }
 ];
 
-export const CASOS_RESUMEN_TEXT: Record<string, string> = {
-  Tiempo: 'Tareas manuales y administrativas que consumen el día (copiar datos, contestar WhatsApps, papeleo)',
-  Procesos: 'Dependencia personal extrema y falta de procedimientos escritos o estandarizados',
-  Datos: 'Falta de visibilidad sobre números reales, márgenes, ganancias o stock en tiempo real',
-  Cliente: 'Falta de seguimiento a presupuestos, oportunidades comerciales y comportamiento de clientes'
-};
-
 export function getInitialStateForStep(step: number): QuestionState {
   if (step === 1) {
     return {
@@ -156,7 +149,7 @@ export function getInitialStateForStep(step: number): QuestionState {
     return {
       step: 2,
       preguntaId: 'P2_RONDA1_PRIMERA',
-      agenteMensaje: 'Paso 1 (Fugas Principales): A continuación te presento 4 situaciones reales de negocio. Elige la situación con la que MÁS te identificas en tu día a día:',
+      agenteMensaje: 'Etapa 1 (Puntos de Fuga): A continuación te presento 4 situaciones reales de negocio. Elige la situación con la que MÁS te identificas en tu día a día:',
       inputType: 'chips',
       chipOptions: CASOS_BASE_BALDE.filter(c => c.ronda === 1).map(c => ({
         id: c.case_id,
@@ -169,7 +162,7 @@ export function getInitialStateForStep(step: number): QuestionState {
     return {
       step: 3,
       preguntaId: 'P3_SELECCION_TAREAS',
-      agenteMensaje: 'Paso 2 (Matriz Frecuencia y Valor): Vamos a evaluar tus tareas operativas y su impacto para clasificarlas en cuadrantes (Oro, Zombi, Cuello de botella, Grasa):',
+      agenteMensaje: 'Etapa 2 (Matriz Frecuencia y Valor): Evaluaremos tus tareas y escenarios operacionales mediante 2 preguntas clave (Frecuencia y Valor generado) para clasificarlas en los cuadrantes: Oro, Zombi, Cuello de botella o Grasa.',
       inputType: 'multi_select_tasks',
       isMultiSelect: true
     };
@@ -177,7 +170,7 @@ export function getInitialStateForStep(step: number): QuestionState {
   return {
     step: 4,
     preguntaId: 'F1',
-    agenteMensaje: `Paso 3 (Flight Levels - Salud Organizativa). 1ª pregunta:\n\n${PREGUNTAS_FLIGHT_LEVELS[0].pregunta}`,
+    agenteMensaje: `Etapa 3 (Flight Levels - Salud Organizativa). 1ª pregunta:\n\n${PREGUNTAS_FLIGHT_LEVELS[0].pregunta}`,
     inputType: 'chips',
     chipOptions: PREGUNTAS_FLIGHT_LEVELS[0].opciones.map(o => ({
       id: o.id,

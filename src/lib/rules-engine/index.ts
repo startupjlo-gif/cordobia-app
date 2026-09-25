@@ -195,8 +195,8 @@ export function clasificarCuadranteTarea(
   const esFrecuenciaAlta = ['Diaria', 'Varias veces por semana', 'Semanal'].includes(frecuencia);
   const esValorAlto = ['El cliente lo nota', 'Perdemos una venta o dinero'].includes(valor);
 
-  if (esValorAlto && esFrecuenciaAlta) return 'Cuello de botella';
-  if (esValorAlto && !esFrecuenciaAlta) return 'Oro';
+  if (esValorAlto && esFrecuenciaAlta) return 'Oro';
+  if (esValorAlto && !esFrecuenciaAlta) return 'Cuello de botella';
   if (!esValorAlto && esFrecuenciaAlta) return 'Zombi';
   return 'Grasa';
 }
