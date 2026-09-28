@@ -36,8 +36,18 @@ export class LocalMockStore {
   private listenersEtapa: Set<(nuevaEtapa: number) => void> = new Set();
 
   private constructor() {
-    this.seedMockData();
-    this.loadFromLocalStorage();
+    this.initStore();
+  }
+
+  private initStore() {
+    if (typeof window !== 'undefined' && localStorage.getItem('cordobia_store_cleared_v1') === 'true') {
+      this.loadFromLocalStorage();
+      return;
+    }
+    const hasData = this.loadFromLocalStorage();
+    if (!hasData) {
+      this.seedMockData();
+    }
   }
 
   public static getInstance(): LocalMockStore {
@@ -67,9 +77,16 @@ export class LocalMockStore {
     this.informes.clear();
     this.tareasParticipante.clear();
     this.sesion.etapa_autorizada = 1;
+
     if (typeof window !== 'undefined') {
       localStorage.removeItem('cordobia_store_v1');
+      if (!keepDemo) {
+        localStorage.setItem('cordobia_store_cleared_v1', 'true');
+      } else {
+        localStorage.removeItem('cordobia_store_cleared_v1');
+      }
     }
+
     if (keepDemo) {
       this.seedMockData();
       this.saveToLocalStorage();
@@ -79,6 +96,9 @@ export class LocalMockStore {
   public saveToLocalStorage() {
     if (typeof window === 'undefined') return;
     try {
+      if (this.empresas.size > 0) {
+        localStorage.removeItem('cordobia_store_cleared_v1');
+      }
       const payload = {
         sesion: this.sesion,
         empresas: Array.from(this.empresas.entries()),
@@ -93,11 +113,11 @@ export class LocalMockStore {
     }
   }
 
-  private loadFromLocalStorage() {
-    if (typeof window === 'undefined') return;
+  private loadFromLocalStorage(): boolean {
+    if (typeof window === 'undefined') return false;
     try {
       const raw = localStorage.getItem('cordobia_store_v1');
-      if (!raw) return;
+      if (!raw) return false;
       const data = JSON.parse(raw);
       if (data.sesion) this.sesion = data.sesion;
       if (Array.isArray(data.empresas)) this.empresas = new Map(data.empresas);
@@ -105,8 +125,10 @@ export class LocalMockStore {
       if (Array.isArray(data.resultados)) this.resultados = new Map(data.resultados);
       if (Array.isArray(data.informes)) this.informes = new Map(data.informes);
       if (Array.isArray(data.tareasParticipante)) this.tareasParticipante = new Map(data.tareasParticipante);
+      return this.empresas.size > 0;
     } catch (e) {
       console.warn('LocalStorage load failed:', e);
+      return false;
     }
   }
 
