@@ -62,6 +62,34 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
   useEffect(() => {
     setEtapaAutorizada(mockStore.sesion.etapa_autorizada || 1);
 
+    const fetchServerStore = async () => {
+      try {
+        const res = await fetch('/api/store');
+        const json = await res.json();
+        if (json.success) {
+          if (json.etapaAutorizada) {
+            setEtapaAutorizada(json.etapaAutorizada);
+          }
+          if (json.empresas && typeof json.empresas === 'object') {
+            Object.values(json.empresas).forEach((emp: any) => {
+              mockStore.empresas.set(emp.id, emp);
+            });
+          }
+          if (json.resultados && Array.isArray(json.resultados)) {
+            json.resultados.forEach((r: any) => {
+              mockStore.resultados.set(r.participante_id, r);
+            });
+          }
+          setDataVersion((v) => v + 1);
+        }
+      } catch (e) {
+        console.warn('Fetch server store error:', e);
+      }
+    };
+
+    fetchServerStore();
+    const interval = setInterval(fetchServerStore, 3000);
+
     const refreshData = () => {
       setDataVersion((v) => v + 1);
     };
@@ -71,6 +99,7 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
     window.addEventListener('cordobia_data_updated', refreshData);
 
     return () => {
+      clearInterval(interval);
       unsubData();
       window.removeEventListener('storage', refreshData);
       window.removeEventListener('cordobia_data_updated', refreshData);
@@ -85,6 +114,32 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
   const handleAutorizarEtapa = (nuevaEtapa: number) => {
     mockStore.autorizarEtapaFacilitador(nuevaEtapa);
     setEtapaAutorizada(nuevaEtapa);
+    try {
+      fetch('/api/store', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'autorizar_etapa', etapaAutorizada: nuevaEtapa })
+      }).catch(err => console.warn('API autorizar error:', err));
+    } catch (e) {
+      console.warn('API autorizar exception:', e);
+    }
+  };
+
+  const handleReiniciarTaller = async () => {
+    if (confirm('⚠️ ¿Estás seguro de que deseas BORRAR TODOS LOS DATOS de empresas y participantes para dejar la sesión 100% limpia antes del taller?')) {
+      try {
+        await fetch('/api/store', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'reset' })
+        });
+      } catch (e) {
+        console.warn('API reset error:', e);
+      }
+      await mockStore.clearSupabaseData();
+      mockStore.resetStore(false);
+      window.location.reload();
+    }
   };
 
   // Filtering Logic
@@ -153,13 +208,6 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
         document.exitFullscreen();
         setIsFullScreen(false);
       }
-    }
-  };
-
-  const handleReiniciarTaller = () => {
-    if (confirm('⚠️ ¿Estás seguro de que deseas BORRAR TODOS LOS DATOS de empresas y participantes para dejar la sesión 100% limpia antes del taller?')) {
-      mockStore.resetStore(false);
-      window.location.reload();
     }
   };
 

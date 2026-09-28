@@ -447,6 +447,22 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
         mockStore.saveToLocalStorage();
         mockStore.syncToSupabase(empObj, resultadoFinal);
 
+        // Send payload to backend API for live cross-device sync across the internet
+        try {
+          fetch('/api/store', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'save_resultado',
+              empresa: empObj,
+              resultado: resultadoFinal,
+              tareas: tareasSeleccionadas
+            })
+          }).catch(err => console.warn('API store POST error:', err));
+        } catch (e) {
+          console.warn('API store exception:', e);
+        }
+
         agregarMensajeAgente(
           `🎉 **¡Diagnóstico Finalizado con Éxito para ${empresaNombre}!**\n\nHemos completado la medición de salud organizativa. Tu facilitador proyectará el resumen del grupo y te entregará el informe detallado en PDF.`
         );
