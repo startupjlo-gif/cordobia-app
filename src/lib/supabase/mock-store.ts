@@ -59,6 +59,23 @@ export class LocalMockStore {
     return () => this.listenersEtapa.delete(callback);
   }
 
+  public resetStore(keepDemo: boolean = false) {
+    this.empresas.clear();
+    this.participantes.clear();
+    this.mensajes.clear();
+    this.resultados.clear();
+    this.informes.clear();
+    this.tareasParticipante.clear();
+    this.sesion.etapa_autorizada = 1;
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('cordobia_store_v1');
+    }
+    if (keepDemo) {
+      this.seedMockData();
+      this.saveToLocalStorage();
+    }
+  }
+
   public saveToLocalStorage() {
     if (typeof window === 'undefined') return;
     try {

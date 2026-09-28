@@ -28,7 +28,9 @@ import {
   Cpu,
   BarChart3,
   Award,
-  AlertCircle
+  AlertCircle,
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 import { CuadranteType, AgujeroType, TareaParticipante } from '@/types';
 
@@ -135,6 +137,13 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
         document.exitFullscreen();
         setIsFullScreen(false);
       }
+    }
+  };
+
+  const handleReiniciarTaller = () => {
+    if (confirm('⚠️ ¿Estás seguro de que deseas BORRAR TODOS LOS DATOS de empresas y participantes para dejar la sesión 100% limpia antes del taller?')) {
+      mockStore.resetStore(false);
+      window.location.reload();
     }
   };
 
@@ -246,6 +255,16 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
                 <option value="Administración General" className="bg-slate-900 text-white">Administración General</option>
               </select>
             </div>
+
+            {/* RESET DATA BUTTON */}
+            <button
+              onClick={handleReiniciarTaller}
+              className="p-2.5 rounded-xl bg-red-950/70 hover:bg-red-900 text-red-300 transition-all flex items-center gap-1.5 text-xs font-bold shadow border border-red-800/60 cursor-pointer"
+              title="Borrar datos y dejar la sesión limpia para el taller"
+            >
+              <Trash2 className="w-4 h-4 text-red-400" />
+              <span>Limpiar Datos</span>
+            </button>
 
             {/* FULLSCREEN PROJECTOR TOGGLE */}
             <button
