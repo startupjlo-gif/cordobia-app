@@ -10,6 +10,7 @@ import {
   Mensaje,
   NumEmpleadosType,
   RespuestaNivel,
+  ResultadoDiagnostico,
   SectorType,
   TareaParticipante
 } from '@/types';
@@ -18,7 +19,7 @@ import {
   PREGUNTAS_FLIGHT_LEVELS,
   getInitialStateForStep
 } from '@/lib/agent-state-machine';
-import { generarDiagnosticoCompleto, clasificarCuadranteTarea } from '@/lib/rules-engine';
+import { generarDiagnosticoCompleto, clasificarCuadranteTarea, calcularFugasBalde } from '@/lib/rules-engine';
 import { LocalMockStore } from '@/lib/supabase/mock-store';
 import { BrandingBanner } from './BrandingBanner';
 import { CheckCircle, ArrowRight, Lock, Sparkles, Building2, PauseCircle, PlayCircle } from 'lucide-react';
@@ -38,6 +39,12 @@ function generateUUID(): string {
   });
 }
 
+const DEFAULT_HOJA_RUTA = {
+  acciones_30: { plazo: '30_dias' as const, titulo: 'Pendiente Etapa 3', color_semaforo: 'amarillo' as const, descripcion: '', que_hacer: '', por_que: '', tareas_relacionadas: [], herramientas_recomendadas: [] },
+  acciones_60: { plazo: '60_dias' as const, titulo: 'Pendiente Etapa 3', color_semaforo: 'amarillo' as const, descripcion: '', que_hacer: '', por_que: '', tareas_relacionadas: [], herramientas_recomendadas: [] },
+  acciones_90: { plazo: '90_dias' as const, titulo: 'Pendiente Etapa 3', color_semaforo: 'amarillo' as const, descripcion: '', que_hacer: '', por_que: '', tareas_relacionadas: [], herramientas_recomendadas: [] }
+};
+
 export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 'CORDOBIA2026' }) => {
   // Etapa state (1: Ficha & Fugas, 2: Matriz Frecuencia/Valor, 3: Flight Levels)
   const [etapaActual, setEtapaActual] = useState<number>(1);
@@ -51,6 +58,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
 
   // Paso 1 Form state
   const [empresaIdState, setEmpresaIdState] = useState<string>('');
+  const [participanteIdState, setParticipanteIdState] = useState<string>('');
   const [nombre, setNombre] = useState<string>('');
   const [empresaNombre, setEmpresaNombre] = useState<string>('');
   const [sector, setSector] = useState<SectorType>('Comercio y Servicios');
@@ -121,8 +129,10 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
     setConfirmacionPaso1(true);
     agregarMensajeParticipante('✅ Ficha de empresa confirmada.');
 
-    const newEmpId = generateUUID();
+    const newEmpId = empresaIdState || generateUUID();
+    const newPartId = participanteIdState || generateUUID();
     setEmpresaIdState(newEmpId);
+    setParticipanteIdState(newPartId);
 
     const empObj: Empresa = {
       id: newEmpId,
@@ -189,7 +199,8 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
         case_id_primera: primeraEleccionRonda,
         case_id_segunda: caseId
       };
-      setEleccionesCasos([...eleccionesCasos, nuevaEleccion]);
+      const todasElecciones = [...eleccionesCasos, nuevaEleccion];
+      setEleccionesCasos(todasElecciones);
       setPrimeraEleccionRonda(null);
 
       if (rondaActual < 3) {
@@ -205,12 +216,74 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
           );
         }, 500);
       } else {
-        // FIN DE ETAPA 1 (CASOS DE FUGA COMPLETA) -> PAUSA HASTA INDICACIÓN DEL MENTOR!
+        // FIN DE ETAPA 1 -> GUARDAR RESULTADO DE FUGA DE ETAPA 1 INCREMENTALMENTE
+        const intensidadesDefault: IntensidadAgujero[] = [
+          { agujero: 'Tiempo', intensidad: 4 },
+          { agujero: 'Procesos', intensidad: 4 },
+          { agujero: 'Datos', intensidad: 3 },
+          { agujero: 'Cliente', intensidad: 2 }
+        ];
+
+        const { fugas, agujeroPrincipal } = calcularFugasBalde(todasElecciones, intensidadesDefault);
+
+        const empId = empresaIdState || generateUUID();
+        const partId = participanteIdState || generateUUID();
+        if (!empresaIdState) setEmpresaIdState(empId);
+        if (!participanteIdState) setParticipanteIdState(partId);
+
+        const empObj: Empresa = {
+          id: empId,
+          nombre: empresaNombre,
+          sector,
+          num_empleados: numEmpleados,
+          ecosistema,
+          herramientas_desuso: herramientasDesuso
+        };
+
+        const resEtapa1: ResultadoDiagnostico = {
+          participante_id: partId,
+          empresa_id: empId,
+          fuga_tiempo: fugas.Tiempo,
+          fuga_procesos: fugas.Procesos,
+          fuga_datos: fugas.Datos,
+          fuga_cliente: fugas.Cliente,
+          agujero_principal: agujeroPrincipal,
+          salud_n1: 0,
+          salud_n2: 0,
+          salud_n3: 0,
+          nivel_debil: 'N1',
+          semaforo: 'amarillo',
+          horas_recuperables: 0,
+          hoja_ruta: DEFAULT_HOJA_RUTA,
+          alertas: [],
+          fugas: fugas,
+          version_reglas: '1.0.0'
+        };
+
+        mockStore.empresas.set(empId, empObj);
+        mockStore.resultados.set(partId, resEtapa1);
+        mockStore.saveToLocalStorage();
+        mockStore.syncToSupabase(empObj, resEtapa1);
+
+        try {
+          fetch('/api/store', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'save_resultado',
+              empresa: empObj,
+              resultado: resEtapa1
+            })
+          }).catch((err) => console.warn('API save_resultado Etapa 1 error:', err));
+        } catch (e) {
+          console.warn('API save_resultado Etapa 1 exception:', e);
+        }
+
         setIsTyping(true);
         setTimeout(() => {
           setIsTyping(false);
           agregarMensajeAgente(
-            `🛑 **¡Etapa 1 Completada!**\n\nHemos identificado los puntos principales de fuga de tu empresa. Por favor, atiende las explicaciones del mentor en la pantalla principal antes de iniciar la Etapa 2.`
+            `🛑 **¡Etapa 1 Completada!**\n\nHemos registrado los puntos principales de fuga de tu empresa (Principal: **${agujeroPrincipal.toUpperCase()}**). Por favor, atiende las explicaciones del mentor en la pantalla principal antes de iniciar la Etapa 2.`
           );
 
           setEsperandoAutorizacionMentor(true);
@@ -378,7 +451,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
             );
           }, 600);
         } else {
-          // FIN DE ETAPA 2 -> RESUMEN DE MATRIZ Y PAUSA MENTOR
+          // FIN DE ETAPA 2 -> GUARDAR MATRIZ Y HORAS INCREMENTALMENTE Y PAUSA MENTOR
           const resumenLineas = tareasCopy
             .map((t, idx) => {
               const quad = t.cuadrante || 'Zombi';
@@ -386,6 +459,69 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
               return `${idx + 1}. "${t.nombre}": ${em} **${quad.toUpperCase()}** (${t.horas_semana}h/sem)`;
             })
             .join('\n');
+
+          const intensidadesDefault: IntensidadAgujero[] = [
+            { agujero: 'Tiempo', intensidad: 4 },
+            { agujero: 'Procesos', intensidad: 4 },
+            { agujero: 'Datos', intensidad: 3 },
+            { agujero: 'Cliente', intensidad: 2 }
+          ];
+
+          const { fugas, agujeroPrincipal } = calcularFugasBalde(eleccionesCasos, intensidadesDefault);
+          const horasRec = tareasCopy.reduce((acc, t) => acc + (t.horas_semana || 0), 0);
+
+          const empId = empresaIdState || generateUUID();
+          const partId = participanteIdState || generateUUID();
+
+          const empObj: Empresa = {
+            id: empId,
+            nombre: empresaNombre,
+            sector,
+            num_empleados: numEmpleados,
+            ecosistema,
+            herramientas_desuso: herramientasDesuso
+          };
+
+          const resEtapa2: ResultadoDiagnostico = {
+            participante_id: partId,
+            empresa_id: empId,
+            fuga_tiempo: fugas.Tiempo,
+            fuga_procesos: fugas.Procesos,
+            fuga_datos: fugas.Datos,
+            fuga_cliente: fugas.Cliente,
+            agujero_principal: agujeroPrincipal,
+            salud_n1: 0,
+            salud_n2: 0,
+            salud_n3: 0,
+            nivel_debil: 'N1',
+            semaforo: 'amarillo',
+            horas_recuperables: Math.round(horasRec * 10) / 10,
+            hoja_ruta: DEFAULT_HOJA_RUTA,
+            alertas: [],
+            fugas: fugas,
+            version_reglas: '1.0.0'
+          };
+
+          mockStore.empresas.set(empId, empObj);
+          mockStore.resultados.set(partId, resEtapa2);
+          mockStore.tareasParticipante.set(partId, tareasCopy);
+          mockStore.saveToLocalStorage();
+          mockStore.syncToSupabase(empObj, resEtapa2);
+
+          try {
+            fetch('/api/store', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'save_resultado',
+                empresa: empObj,
+                resultado: resEtapa2,
+                tareas: tareasCopy
+              })
+            }).catch((err) => console.warn('API save_resultado Etapa 2 error:', err));
+          } catch (e) {
+            console.warn('API save_resultado Etapa 2 exception:', e);
+          }
 
           setTimeout(() => {
             agregarMensajeAgente(
@@ -468,8 +604,10 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
           nuevasRespuestas
         );
 
-        const partId = generateUUID();
+        const partId = participanteIdState || generateUUID();
         const empId = empresaIdState || generateUUID();
+        if (!participanteIdState) setParticipanteIdState(partId);
+        if (!empresaIdState) setEmpresaIdState(empId);
 
         const empObj: Empresa = {
           id: empId,

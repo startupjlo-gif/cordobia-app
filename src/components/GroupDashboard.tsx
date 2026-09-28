@@ -80,6 +80,11 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
               mockStore.resultados.set(r.participante_id, r);
             });
           }
+          if (json.tareasParticipante && Array.isArray(json.tareasParticipante)) {
+            json.tareasParticipante.forEach(([partId, tareas]: [string, any]) => {
+              mockStore.tareasParticipante.set(partId, tareas);
+            });
+          }
           setDataVersion((v) => v + 1);
         }
       } catch (e) {

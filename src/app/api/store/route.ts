@@ -136,12 +136,15 @@ export async function POST(req: Request) {
         }
 
         // 2. Upsert Participante (to satisfy Foreign Key constraint)
+        const isCompletado = Boolean(resultado.salud_n1 && resultado.salud_n1 > 0);
+        const pasoActualCalc = isCompletado ? 4 : ((resultado.horas_recuperables && resultado.horas_recuperables > 0) ? 3 : 2);
+
         const { error: errPart } = await supabase.from('participante').upsert({
           id: resultado.participante_id,
           empresa_id: empresa.id,
           nombre: empresa.nombre,
-          estado: 'completado',
-          paso_actual: 4,
+          estado: isCompletado ? 'completado' : 'en_progreso',
+          paso_actual: pasoActualCalc,
         });
         if (errPart) {
           console.error('Supabase save participante error:', errPart);
@@ -152,19 +155,19 @@ export async function POST(req: Request) {
         const { error: errRes } = await supabase.from('resultado').upsert({
           participante_id: resultado.participante_id,
           empresa_id: resultado.empresa_id,
-          fuga_tiempo: resultado.fuga_tiempo,
-          fuga_procesos: resultado.fuga_procesos,
-          fuga_datos: resultado.fuga_datos,
-          fuga_cliente: resultado.fuga_cliente,
-          agujero_principal: resultado.agujero_principal,
-          salud_n1: resultado.salud_n1,
-          salud_n2: resultado.salud_n2,
-          salud_n3: resultado.salud_n3,
-          nivel_debil: resultado.nivel_debil,
-          semaforo: resultado.semaforo,
-          horas_recuperables: resultado.horas_recuperables,
-          hoja_ruta: resultado.hoja_ruta,
-          alertas: resultado.alertas,
+          fuga_tiempo: resultado.fuga_tiempo ?? 0,
+          fuga_procesos: resultado.fuga_procesos ?? 0,
+          fuga_datos: resultado.fuga_datos ?? 0,
+          fuga_cliente: resultado.fuga_cliente ?? 0,
+          agujero_principal: resultado.agujero_principal || 'Tiempo',
+          salud_n1: resultado.salud_n1 ?? 0,
+          salud_n2: resultado.salud_n2 ?? 0,
+          salud_n3: resultado.salud_n3 ?? 0,
+          nivel_debil: resultado.nivel_debil || 'N1',
+          semaforo: resultado.semaforo || 'amarillo',
+          horas_recuperables: resultado.horas_recuperables ?? 0,
+          hoja_ruta: resultado.hoja_ruta || { acciones_30_dias: [], acciones_60_dias: [], acciones_90_dias: [] },
+          alertas: resultado.alertas || [],
         });
         if (errRes) {
           console.error('Supabase save resultado error:', errRes);
