@@ -702,8 +702,8 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
                 </div>
 
                 <div className="space-y-2 text-xs max-h-48 overflow-y-auto">
-                  {resultadosFiltrados.flatMap((r) => r.alertas || []).length > 0 ? (
-                    resultadosFiltrados.flatMap((r) => r.alertas || []).map((alerta, idx) => (
+                  {resultadosFL.flatMap((r) => r.alertas || []).length > 0 ? (
+                    resultadosFL.flatMap((r) => r.alertas || []).map((alerta, idx) => (
                       <div
                         key={idx}
                         className={`p-3 rounded-xl border flex items-start gap-2.5 ${

@@ -27,15 +27,32 @@ export async function GET() {
         empresasMap[e.id] = e;
       });
 
-      const resultadosList = (dbResultados || []).map((r) => ({
-        ...r,
-        fugas: {
-          Tiempo: r.fuga_tiempo,
-          Procesos: r.fuga_procesos,
-          Datos: r.fuga_datos,
-          Cliente: r.fuga_cliente,
-        },
-      }));
+      const resultadosList = (dbResultados || []).map((r) => {
+        let parsedHojaRuta = r.hoja_ruta;
+        if (typeof parsedHojaRuta === 'string') {
+          try { parsedHojaRuta = JSON.parse(parsedHojaRuta); } catch (e) {}
+        }
+        let parsedAlertas = r.alertas;
+        if (typeof parsedAlertas === 'string') {
+          try { parsedAlertas = JSON.parse(parsedAlertas); } catch (e) {}
+        }
+
+        const isEtapa3 = Boolean(parsedHojaRuta?.acciones_30?.titulo && parsedHojaRuta.acciones_30.titulo !== 'Pendiente Etapa 3');
+        const isEtapa2 = Boolean(r.horas_recuperables && r.horas_recuperables > 0);
+
+        return {
+          ...r,
+          hoja_ruta: parsedHojaRuta,
+          alertas: parsedAlertas,
+          etapa_completada: r.etapa_completada || (isEtapa3 ? 3 : (isEtapa2 ? 2 : 1)),
+          fugas: {
+            Tiempo: r.fuga_tiempo ?? 0,
+            Procesos: r.fuga_procesos ?? 0,
+            Datos: r.fuga_datos ?? 0,
+            Cliente: r.fuga_cliente ?? 0,
+          },
+        };
+      });
 
       return NextResponse.json({
         success: true,
