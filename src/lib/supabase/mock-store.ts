@@ -34,6 +34,7 @@ export class LocalMockStore {
   public tareasParticipante: Map<string, TareaParticipante[]> = new Map();
 
   private listenersEtapa: Set<(nuevaEtapa: number) => void> = new Set();
+  private listenersData: Set<() => void> = new Set();
 
   private constructor() {
     this.initStore();
@@ -69,6 +70,18 @@ export class LocalMockStore {
     return () => this.listenersEtapa.delete(callback);
   }
 
+  public onDataChanged(callback: () => void) {
+    this.listenersData.add(callback);
+    return () => this.listenersData.delete(callback);
+  }
+
+  public notifyDataChanged() {
+    this.listenersData.forEach((fn) => fn());
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('cordobia_data_updated'));
+    }
+  }
+
   public resetStore(keepDemo: boolean = false) {
     this.empresas.clear();
     this.participantes.clear();
@@ -91,6 +104,7 @@ export class LocalMockStore {
       this.seedMockData();
       this.saveToLocalStorage();
     }
+    this.notifyDataChanged();
   }
 
   public saveToLocalStorage() {
@@ -108,6 +122,7 @@ export class LocalMockStore {
         tareasParticipante: Array.from(this.tareasParticipante.entries()),
       };
       localStorage.setItem('cordobia_store_v1', JSON.stringify(payload));
+      this.notifyDataChanged();
     } catch (e) {
       console.warn('LocalStorage save failed:', e);
     }

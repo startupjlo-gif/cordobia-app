@@ -57,14 +57,30 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
   });
 
   const mockStore = LocalMockStore.getInstance();
+  const [dataVersion, setDataVersion] = useState<number>(0);
+
+  useEffect(() => {
+    setEtapaAutorizada(mockStore.sesion.etapa_autorizada || 1);
+
+    const refreshData = () => {
+      setDataVersion((v) => v + 1);
+    };
+
+    const unsubData = mockStore.onDataChanged(refreshData);
+    window.addEventListener('storage', refreshData);
+    window.addEventListener('cordobia_data_updated', refreshData);
+
+    return () => {
+      unsubData();
+      window.removeEventListener('storage', refreshData);
+      window.removeEventListener('cordobia_data_updated', refreshData);
+    };
+  }, []);
+
   const resultadosArray = Array.from(mockStore.resultados.values());
   const empresasArray = Array.from(mockStore.empresas.values());
   const empresasMap = mockStore.empresas;
   const tareasParticipanteMap = mockStore.tareasParticipante;
-
-  useEffect(() => {
-    setEtapaAutorizada(mockStore.sesion.etapa_autorizada || 1);
-  }, []);
 
   const handleAutorizarEtapa = (nuevaEtapa: number) => {
     mockStore.autorizarEtapaFacilitador(nuevaEtapa);
