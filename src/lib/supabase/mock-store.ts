@@ -7,7 +7,8 @@ import {
   Sesion,
   TareaParticipante
 } from '@/types';
-import { CATALOGO_HERRAMIENTAS, generarDiagnosticoCompleto } from '@/lib/rules-engine';
+import { generarDiagnosticoCompleto } from '@/lib/rules-engine';
+import { supabase, isSupabaseConfigured } from './client';
 
 export class LocalMockStore {
   private static instance: LocalMockStore;
@@ -36,6 +37,7 @@ export class LocalMockStore {
 
   private constructor() {
     this.seedMockData();
+    this.loadFromLocalStorage();
   }
 
   public static getInstance(): LocalMockStore {
@@ -48,12 +50,83 @@ export class LocalMockStore {
   // Facilitator Master Control Action: Broadcasts stage advance to all active devices
   public autorizarEtapaFacilitador(nuevaEtapa: number) {
     this.sesion.etapa_autorizada = nuevaEtapa;
+    this.saveToLocalStorage();
     this.listenersEtapa.forEach((listener) => listener(nuevaEtapa));
   }
 
   public onEtapaCambiada(callback: (nuevaEtapa: number) => void) {
     this.listenersEtapa.add(callback);
     return () => this.listenersEtapa.delete(callback);
+  }
+
+  public saveToLocalStorage() {
+    if (typeof window === 'undefined') return;
+    try {
+      const payload = {
+        sesion: this.sesion,
+        empresas: Array.from(this.empresas.entries()),
+        participantes: Array.from(this.participantes.entries()),
+        resultados: Array.from(this.resultados.entries()),
+        informes: Array.from(this.informes.entries()),
+        tareasParticipante: Array.from(this.tareasParticipante.entries()),
+      };
+      localStorage.setItem('cordobia_store_v1', JSON.stringify(payload));
+    } catch (e) {
+      console.warn('LocalStorage save failed:', e);
+    }
+  }
+
+  private loadFromLocalStorage() {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem('cordobia_store_v1');
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data.sesion) this.sesion = data.sesion;
+      if (Array.isArray(data.empresas)) this.empresas = new Map(data.empresas);
+      if (Array.isArray(data.participantes)) this.participantes = new Map(data.participantes);
+      if (Array.isArray(data.resultados)) this.resultados = new Map(data.resultados);
+      if (Array.isArray(data.informes)) this.informes = new Map(data.informes);
+      if (Array.isArray(data.tareasParticipante)) this.tareasParticipante = new Map(data.tareasParticipante);
+    } catch (e) {
+      console.warn('LocalStorage load failed:', e);
+    }
+  }
+
+  public async syncToSupabase(empresa: Empresa, resultado: ResultadoDiagnostico) {
+    if (!isSupabaseConfigured || !supabase) return;
+    try {
+      // Insert / Upsert Empresa
+      await supabase.from('empresa').upsert({
+        id: empresa.id,
+        nombre: empresa.nombre,
+        sector: empresa.sector,
+        num_empleados: empresa.num_empleados,
+        ecosistema: empresa.ecosistema,
+        herramientas_desuso: empresa.herramientas_desuso
+      });
+
+      // Insert / Upsert Resultado
+      await supabase.from('resultado').upsert({
+        participante_id: resultado.participante_id,
+        empresa_id: resultado.empresa_id,
+        fuga_tiempo: resultado.fuga_tiempo,
+        fuga_procesos: resultado.fuga_procesos,
+        fuga_datos: resultado.fuga_datos,
+        fuga_cliente: resultado.fuga_cliente,
+        agujero_principal: resultado.agujero_principal,
+        salud_n1: resultado.salud_n1,
+        salud_n2: resultado.salud_n2,
+        salud_n3: resultado.salud_n3,
+        nivel_debil: resultado.nivel_debil,
+        semaforo: resultado.semaforo,
+        horas_recuperables: resultado.horas_recuperables,
+        hoja_ruta: resultado.hoja_ruta,
+        alertas: resultado.alertas
+      });
+    } catch (e) {
+      console.warn('Supabase sync error:', e);
+    }
   }
 
   private seedMockData() {

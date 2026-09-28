@@ -5,6 +5,7 @@ import {
   ChipOption,
   EcosistemaType,
   EleccionCaso,
+  Empresa,
   IntensidadAgujero,
   Mensaje,
   NumEmpleadosType,
@@ -429,18 +430,22 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
         const partId = `part-${Date.now()}`;
         const empId = `emp-${Date.now()}`;
 
-        mockStore.empresas.set(empId, {
+        const empObj: Empresa = {
           id: empId,
           nombre: empresaNombre,
           sector,
           num_empleados: numEmpleados,
           ecosistema,
           herramientas_desuso: herramientasDesuso
-        });
+        };
+
+        mockStore.empresas.set(empId, empObj);
 
         resultadoFinal.participante_id = partId;
         resultadoFinal.empresa_id = empId;
         mockStore.resultados.set(partId, resultadoFinal);
+        mockStore.saveToLocalStorage();
+        mockStore.syncToSupabase(empObj, resultadoFinal);
 
         agregarMensajeAgente(
           `🎉 **¡Diagnóstico Finalizado con Éxito para ${empresaNombre}!**\n\nHemos completado la medición de salud organizativa. Tu facilitador proyectará el resumen del grupo y te entregará el informe detallado en PDF.`
