@@ -182,6 +182,7 @@ export class LocalMockStore {
 
       // Insert / Upsert Resultado
       await supabase.from('resultado').upsert({
+        id: resultado.participante_id,
         participante_id: resultado.participante_id,
         empresa_id: resultado.empresa_id,
         fuga_tiempo: resultado.fuga_tiempo,

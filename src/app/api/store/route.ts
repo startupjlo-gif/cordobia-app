@@ -12,70 +12,78 @@ const globalServerStore = {
 
 export async function GET() {
   try {
-    if (isSupabaseConfigured && supabase) {
-      const { data: dbEmpresas, error: errEmp } = await supabase.from('empresa').select('*');
-      const { data: dbResultados, error: errRes } = await supabase.from('resultado').select('*');
-      const { data: dbSesiones } = await supabase.from('sesion').select('*').limit(1);
-
-      if (errEmp) console.warn('Supabase get empresas error:', errEmp);
-      if (errRes) console.warn('Supabase get resultados error:', errRes);
-
-      const etapa = dbSesiones?.[0]?.etapa_autorizada || globalServerStore.etapaAutorizada;
-
-      const empresasMap: Record<string, Empresa> = {};
-      (dbEmpresas || []).forEach((e) => {
-        empresasMap[e.id] = e;
-      });
-
-      const resultadosList = (dbResultados || []).map((r) => {
-        let parsedHojaRuta = r.hoja_ruta;
-        if (typeof parsedHojaRuta === 'string') {
-          try { parsedHojaRuta = JSON.parse(parsedHojaRuta); } catch (e) {}
-        }
-        let parsedAlertas = r.alertas;
-        if (typeof parsedAlertas === 'string') {
-          try { parsedAlertas = JSON.parse(parsedAlertas); } catch (e) {}
-        }
-
-        const isEtapa3 = Boolean(parsedHojaRuta?.acciones_30?.titulo && parsedHojaRuta.acciones_30.titulo !== 'Pendiente Etapa 3');
-        const isEtapa2 = Boolean(r.horas_recuperables && r.horas_recuperables > 0);
-
-        return {
-          ...r,
-          hoja_ruta: parsedHojaRuta,
-          alertas: parsedAlertas,
-          etapa_completada: r.etapa_completada || (isEtapa3 ? 3 : (isEtapa2 ? 2 : 1)),
-          fugas: {
-            Tiempo: r.fuga_tiempo ?? 0,
-            Procesos: r.fuga_procesos ?? 0,
-            Datos: r.fuga_datos ?? 0,
-            Cliente: r.fuga_cliente ?? 0,
-          },
-        };
-      });
-
-      return NextResponse.json({
-        success: true,
-        isSupabase: true,
-        etapaAutorizada: etapa,
-        empresas: empresasMap,
-        resultados: resultadosList,
-        tareasParticipante: Array.from(globalServerStore.tareasParticipante.entries()),
-      });
-    }
-
-    // Fallback to In-Memory Global Server Store
     const empresasMap: Record<string, Empresa> = {};
+    const resultadosMap: Record<string, any> = {};
+
+    // 1. Populate from in-memory server store
     globalServerStore.empresas.forEach((val, key) => {
       empresasMap[key] = val;
     });
+    globalServerStore.resultados.forEach((val, key) => {
+      resultadosMap[key] = val;
+    });
+
+    let etapaAutorizada = globalServerStore.etapaAutorizada;
+    let isSupabase = false;
+
+    // 2. Merge from Supabase PostgreSQL DB if configured
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: dbEmpresas, error: errEmp } = await supabase.from('empresa').select('*');
+        const { data: dbResultados, error: errRes } = await supabase.from('resultado').select('*');
+        const { data: dbSesiones } = await supabase.from('sesion').select('*').limit(1);
+
+        if (errEmp) console.warn('Supabase get empresas error:', errEmp);
+        if (errRes) console.warn('Supabase get resultados error:', errRes);
+
+        isSupabase = true;
+        if (dbSesiones?.[0]?.etapa_autorizada) {
+          etapaAutorizada = dbSesiones[0].etapa_autorizada;
+        }
+
+        (dbEmpresas || []).forEach((e) => {
+          empresasMap[e.id] = e;
+        });
+
+        (dbResultados || []).forEach((r) => {
+          let parsedHojaRuta = r.hoja_ruta;
+          if (typeof parsedHojaRuta === 'string') {
+            try { parsedHojaRuta = JSON.parse(parsedHojaRuta); } catch (e) {}
+          }
+          let parsedAlertas = r.alertas;
+          if (typeof parsedAlertas === 'string') {
+            try { parsedAlertas = JSON.parse(parsedAlertas); } catch (e) {}
+          }
+
+          const isEtapa3 = Boolean(parsedHojaRuta?.acciones_30?.titulo && parsedHojaRuta.acciones_30.titulo !== 'Pendiente Etapa 3');
+          const isEtapa2 = Boolean(r.horas_recuperables && r.horas_recuperables > 0);
+
+          const key = r.participante_id || r.id;
+          resultadosMap[key] = {
+            ...r,
+            participante_id: key,
+            hoja_ruta: parsedHojaRuta,
+            alertas: parsedAlertas,
+            etapa_completada: r.etapa_completada || (isEtapa3 ? 3 : (isEtapa2 ? 2 : 1)),
+            fugas: r.fugas || {
+              Tiempo: r.fuga_tiempo ?? 0,
+              Procesos: r.fuga_procesos ?? 0,
+              Datos: r.fuga_datos ?? 0,
+              Cliente: r.fuga_cliente ?? 0,
+            },
+          };
+        });
+      } catch (dbErr) {
+        console.warn('Supabase fetch exception, falling back to server memory:', dbErr);
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      isSupabase: false,
-      etapaAutorizada: globalServerStore.etapaAutorizada,
+      isSupabase,
+      etapaAutorizada,
       empresas: empresasMap,
-      resultados: Array.from(globalServerStore.resultados.values()),
+      resultados: Object.values(resultadosMap),
       tareasParticipante: Array.from(globalServerStore.tareasParticipante.entries()),
     });
   } catch (error: any) {
@@ -168,8 +176,9 @@ export async function POST(req: Request) {
           return NextResponse.json({ success: false, error: errPart.message }, { status: 400 });
         }
 
-        // 3. Upsert Resultado
+        // 3. Upsert Resultado (explicitly pass id to avoid PRIMARY KEY not-null constraint errors)
         const { error: errRes } = await supabase.from('resultado').upsert({
+          id: resultado.participante_id,
           participante_id: resultado.participante_id,
           empresa_id: resultado.empresa_id,
           fuga_tiempo: resultado.fuga_tiempo ?? 0,
