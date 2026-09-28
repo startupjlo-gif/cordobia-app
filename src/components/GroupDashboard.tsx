@@ -171,7 +171,7 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
   const estimadoEconomicoAnual = Math.round(totalHoras * 52 * 25); // 25€/h average wage cost
 
   // Flight Levels & Semáforo Calculations (only over participants who have reached/completed Etapa 3)
-  const resultadosFL = resultadosFiltrados.filter((r) => (r.salud_n1 || 0) > 0 || (r.salud_n2 || 0) > 0 || (r.salud_n3 || 0) > 0);
+  const resultadosFL = resultadosFiltrados.filter((r) => r.etapa_completada === 3 || (r.hoja_ruta && r.hoja_ruta.acciones_30 && r.hoja_ruta.acciones_30.titulo !== 'Pendiente Etapa 3'));
   const numEmpresasFL = resultadosFL.length;
 
   const avgN1 = numEmpresasFL > 0 ? Math.round(resultadosFL.reduce((a, b) => a + (b.salud_n1 || 0), 0) / numEmpresasFL) : 0;
@@ -761,9 +761,9 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
                     ) : (
                       empresasFiltradas.map((emp) => {
                         const res = resultadosArray.find((r) => r.empresa_id === emp.id);
-                        const tieneFL = res && (res.salud_n1 || 0) > 0;
-                        const tieneMatriz = res && (res.horas_recuperables || 0) > 0;
-                        const tieneFugas = res && res.fuga_tiempo !== undefined;
+                        const tieneFL = res && (res.etapa_completada === 3 || (res.hoja_ruta && res.hoja_ruta.acciones_30 && res.hoja_ruta.acciones_30.titulo !== 'Pendiente Etapa 3'));
+                        const tieneMatriz = res && (res.etapa_completada === 2 || (res.horas_recuperables || 0) > 0);
+                        const tieneFugas = res && (res.etapa_completada === 1 || res.fuga_tiempo !== undefined);
 
                         return (
                           <tr key={emp.id} className="hover:bg-slate-800/40 transition-colors">

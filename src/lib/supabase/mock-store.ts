@@ -170,6 +170,16 @@ export class LocalMockStore {
         herramientas_desuso: empresa.herramientas_desuso
       });
 
+      // Insert / Upsert Participante (FK requirement)
+      const isCompletado = resultado.etapa_completada === 3;
+      await supabase.from('participante').upsert({
+        id: resultado.participante_id,
+        empresa_id: empresa.id,
+        nombre: empresa.nombre,
+        estado: isCompletado ? 'completado' : 'en_progreso',
+        paso_actual: isCompletado ? 4 : (resultado.etapa_completada === 2 ? 3 : 2),
+      });
+
       // Insert / Upsert Resultado
       await supabase.from('resultado').upsert({
         participante_id: resultado.participante_id,

@@ -158,6 +158,7 @@ export interface ResultadoDiagnostico {
   hoja_ruta: HojaRuta;
   alertas: AlertaCoherencia[];
   version_reglas: string;
+  etapa_completada?: number;
 }
 
 export interface Herramienta {

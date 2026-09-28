@@ -136,8 +136,8 @@ export async function POST(req: Request) {
         }
 
         // 2. Upsert Participante (to satisfy Foreign Key constraint)
-        const isCompletado = Boolean(resultado.salud_n1 && resultado.salud_n1 > 0);
-        const pasoActualCalc = isCompletado ? 4 : ((resultado.horas_recuperables && resultado.horas_recuperables > 0) ? 3 : 2);
+        const isCompletado = resultado.etapa_completada === 3 || (resultado.salud_n1 !== undefined && resultado.salud_n1 >= 0 && resultado.hoja_ruta?.acciones_30?.titulo !== 'Pendiente Etapa 3');
+        const pasoActualCalc = isCompletado ? 4 : (resultado.etapa_completada === 2 ? 3 : 2);
 
         const { error: errPart } = await supabase.from('participante').upsert({
           id: resultado.participante_id,

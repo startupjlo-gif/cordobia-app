@@ -455,6 +455,7 @@ export function generarDiagnosticoCompleto(
     horas_recuperables: Number(horasRecuperables.toFixed(1)),
     hoja_ruta: hojaRuta,
     alertas,
-    version_reglas: '1.0.0'
+    version_reglas: '1.0.0',
+    etapa_completada: 3
   };
 }

@@ -257,7 +257,8 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
           hoja_ruta: DEFAULT_HOJA_RUTA,
           alertas: [],
           fugas: fugas,
-          version_reglas: '1.0.0'
+          version_reglas: '1.0.0',
+          etapa_completada: 1
         };
 
         mockStore.empresas.set(empId, empObj);
@@ -499,7 +500,8 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
             hoja_ruta: DEFAULT_HOJA_RUTA,
             alertas: [],
             fugas: fugas,
-            version_reglas: '1.0.0'
+            version_reglas: '1.0.0',
+            etapa_completada: 2
           };
 
           mockStore.empresas.set(empId, empObj);
@@ -622,6 +624,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
 
         resultadoFinal.participante_id = partId;
         resultadoFinal.empresa_id = empId;
+        resultadoFinal.etapa_completada = 3;
         mockStore.resultados.set(partId, resultadoFinal);
         mockStore.saveToLocalStorage();
         mockStore.syncToSupabase(empObj, resultadoFinal);
