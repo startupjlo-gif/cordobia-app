@@ -13,9 +13,12 @@ const globalServerStore = {
 export async function GET() {
   try {
     if (isSupabaseConfigured && supabase) {
-      const { data: dbEmpresas } = await supabase.from('empresa').select('*');
-      const { data: dbResultados } = await supabase.from('resultado').select('*');
+      const { data: dbEmpresas, error: errEmp } = await supabase.from('empresa').select('*');
+      const { data: dbResultados, error: errRes } = await supabase.from('resultado').select('*');
       const { data: dbSesiones } = await supabase.from('sesion').select('*').limit(1);
+
+      if (errEmp) console.warn('Supabase get empresas error:', errEmp);
+      if (errRes) console.warn('Supabase get resultados error:', errRes);
 
       const etapa = dbSesiones?.[0]?.etapa_autorizada || globalServerStore.etapaAutorizada;
 
@@ -36,6 +39,7 @@ export async function GET() {
 
       return NextResponse.json({
         success: true,
+        isSupabase: true,
         etapaAutorizada: etapa,
         empresas: empresasMap,
         resultados: resultadosList,
@@ -51,6 +55,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
+      isSupabase: false,
       etapaAutorizada: globalServerStore.etapaAutorizada,
       empresas: empresasMap,
       resultados: Array.from(globalServerStore.resultados.values()),
@@ -82,9 +87,29 @@ export async function POST(req: Request) {
 
       if (isSupabaseConfigured && supabase) {
         await supabase.from('resultado').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('participante').delete().neq('id', '00000000-0000-0000-0000-000000000000');
         await supabase.from('empresa').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       }
       return NextResponse.json({ success: true, message: 'Store reset completely' });
+    }
+
+    if (action === 'save_empresa' && empresa) {
+      globalServerStore.empresas.set(empresa.id, empresa);
+      if (isSupabaseConfigured && supabase) {
+        const { error: errEmp } = await supabase.from('empresa').upsert({
+          id: empresa.id,
+          nombre: empresa.nombre,
+          sector: empresa.sector,
+          num_empleados: empresa.num_empleados,
+          ecosistema: empresa.ecosistema,
+          herramientas_desuso: empresa.herramientas_desuso,
+        });
+        if (errEmp) {
+          console.error('Supabase empresa upsert error:', errEmp);
+          return NextResponse.json({ success: false, error: errEmp.message }, { status: 400 });
+        }
+      }
+      return NextResponse.json({ success: true, empresaId: empresa.id });
     }
 
     if (action === 'save_resultado' && empresa && resultado) {
@@ -96,8 +121,8 @@ export async function POST(req: Request) {
       }
 
       if (isSupabaseConfigured && supabase) {
-        // Upsert Empresa
-        await supabase.from('empresa').upsert({
+        // 1. Upsert Empresa
+        const { error: errEmp } = await supabase.from('empresa').upsert({
           id: empresa.id,
           nombre: empresa.nombre,
           sector: empresa.sector,
@@ -105,9 +130,26 @@ export async function POST(req: Request) {
           ecosistema: empresa.ecosistema,
           herramientas_desuso: empresa.herramientas_desuso,
         });
+        if (errEmp) {
+          console.error('Supabase save empresa error:', errEmp);
+          return NextResponse.json({ success: false, error: errEmp.message }, { status: 400 });
+        }
 
-        // Upsert Resultado
-        await supabase.from('resultado').upsert({
+        // 2. Upsert Participante (to satisfy Foreign Key constraint)
+        const { error: errPart } = await supabase.from('participante').upsert({
+          id: resultado.participante_id,
+          empresa_id: empresa.id,
+          nombre: empresa.nombre,
+          estado: 'completado',
+          paso_actual: 4,
+        });
+        if (errPart) {
+          console.error('Supabase save participante error:', errPart);
+          return NextResponse.json({ success: false, error: errPart.message }, { status: 400 });
+        }
+
+        // 3. Upsert Resultado
+        const { error: errRes } = await supabase.from('resultado').upsert({
           participante_id: resultado.participante_id,
           empresa_id: resultado.empresa_id,
           fuga_tiempo: resultado.fuga_tiempo,
@@ -124,6 +166,10 @@ export async function POST(req: Request) {
           hoja_ruta: resultado.hoja_ruta,
           alertas: resultado.alertas,
         });
+        if (errRes) {
+          console.error('Supabase save resultado error:', errRes);
+          return NextResponse.json({ success: false, error: errRes.message }, { status: 400 });
+        }
       }
 
       return NextResponse.json({ success: true, empresaId: empresa.id });
@@ -131,6 +177,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
   } catch (error: any) {
+    console.error('API store POST error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

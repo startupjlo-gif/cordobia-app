@@ -27,6 +27,17 @@ interface ParticipantChatProps {
   sessionCode?: string;
 }
 
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 'CORDOBIA2026' }) => {
   // Etapa state (1: Ficha & Fugas, 2: Matriz Frecuencia/Valor, 3: Flight Levels)
   const [etapaActual, setEtapaActual] = useState<number>(1);
@@ -39,6 +50,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
   const [siguienteEtapaNombre, setSiguienteEtapaNombre] = useState<string>('');
 
   // Paso 1 Form state
+  const [empresaIdState, setEmpresaIdState] = useState<string>('');
   const [nombre, setNombre] = useState<string>('');
   const [empresaNombre, setEmpresaNombre] = useState<string>('');
   const [sector, setSector] = useState<SectorType>('Comercio y Servicios');
@@ -108,6 +120,35 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
   const handleConfirmarPaso1 = () => {
     setConfirmacionPaso1(true);
     agregarMensajeParticipante('✅ Ficha de empresa confirmada.');
+
+    const newEmpId = generateUUID();
+    setEmpresaIdState(newEmpId);
+
+    const empObj: Empresa = {
+      id: newEmpId,
+      nombre: empresaNombre,
+      sector,
+      num_empleados: numEmpleados,
+      ecosistema,
+      herramientas_desuso: herramientasDesuso
+    };
+
+    mockStore.empresas.set(newEmpId, empObj);
+    mockStore.saveToLocalStorage();
+
+    try {
+      fetch('/api/store', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save_empresa',
+          empresa: empObj
+        })
+      }).catch((err) => console.warn('API save_empresa error:', err));
+    } catch (e) {
+      console.warn('API save_empresa exception:', e);
+    }
+
     setIsTyping(true);
 
     setTimeout(() => {
@@ -427,8 +468,8 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
           nuevasRespuestas
         );
 
-        const partId = `part-${Date.now()}`;
-        const empId = `emp-${Date.now()}`;
+        const partId = generateUUID();
+        const empId = empresaIdState || generateUUID();
 
         const empObj: Empresa = {
           id: empId,
