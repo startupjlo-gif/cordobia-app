@@ -21,9 +21,9 @@ interface IndividualReportProps {
 
 export const IndividualReport: React.FC<IndividualReportProps> = ({ empresaId = 'emp-1' }) => {
   const mockStore = LocalMockStore.getInstance();
-  const empresa = mockStore.empresas.get(empresaId) || mockStore.empresas.values().next().value;
-  const resultado = mockStore.resultados.get(`part-1`) || mockStore.resultados.values().next().value;
-  const tareas = mockStore.tareasParticipante.get('part-1') || [];
+  const empresa = mockStore.empresas.get(empresaId) || Array.from(mockStore.empresas.values()).find((e: any) => e.id === empresaId) || mockStore.empresas.values().next().value;
+  const resultado = Array.from(mockStore.resultados.values()).find((r: any) => r.empresa_id === empresaId) || mockStore.resultados.get(empresaId) || mockStore.resultados.values().next().value;
+  const tareas = resultado ? (mockStore.tareasParticipante.get(resultado.participante_id) || []) : [];
 
   const [editandoSummary, setEditandoSummary] = useState<boolean>(false);
   const [resumenTexto, setResumenTexto] = useState<string>(
@@ -279,7 +279,7 @@ export const IndividualReport: React.FC<IndividualReportProps> = ({ empresaId = 
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {tareas.map((t, idx) => (
+                    {tareas.map((t: any, idx: number) => (
                       <tr key={idx} className="hover:bg-slate-50">
                         <td className="p-2 font-semibold text-slate-800">{t.nombre}</td>
                         <td className="p-2 text-slate-500">{t.area}</td>
@@ -347,7 +347,7 @@ export const IndividualReport: React.FC<IndividualReportProps> = ({ empresaId = 
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">Herramientas Recomendadas:</span>
                   <div className="space-y-1">
-                    {resultado?.hoja_ruta?.acciones_30?.herramientas_recomendadas?.map((h) => (
+                    {resultado?.hoja_ruta?.acciones_30?.herramientas_recomendadas?.map((h: any) => (
                       <div key={h.id} className="bg-white p-1.5 rounded border border-slate-200 text-[11px] font-semibold text-slate-700">
                         {h.nombre}
                       </div>
@@ -369,7 +369,7 @@ export const IndividualReport: React.FC<IndividualReportProps> = ({ empresaId = 
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">Herramientas Recomendadas:</span>
                   <div className="space-y-1">
-                    {resultado?.hoja_ruta?.acciones_60?.herramientas_recomendadas?.map((h) => (
+                    {resultado?.hoja_ruta?.acciones_60?.herramientas_recomendadas?.map((h: any) => (
                       <div key={h.id} className="bg-white p-1.5 rounded border border-slate-200 text-[11px] font-semibold text-slate-700">
                         {h.nombre}
                       </div>
@@ -391,7 +391,7 @@ export const IndividualReport: React.FC<IndividualReportProps> = ({ empresaId = 
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">Herramientas Recomendadas:</span>
                   <div className="space-y-1">
-                    {resultado?.hoja_ruta?.acciones_90?.herramientas_recomendadas?.map((h) => (
+                    {resultado?.hoja_ruta?.acciones_90?.herramientas_recomendadas?.map((h: any) => (
                       <div key={h.id} className="bg-white p-1.5 rounded border border-slate-200 text-[11px] font-semibold text-slate-700">
                         {h.nombre}
                       </div>

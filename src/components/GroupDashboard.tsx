@@ -160,28 +160,38 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
   const numEmpresas = resultadosFiltrados.length;
   const esAnonimoInsuficiente = numEmpresas < 3 && empresaFiltroId === 'TODAS' && sectorFiltro !== 'Todos';
 
-  // Metrics Calculations
-  const avgTiempo = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + b.fuga_tiempo, 0) / numEmpresas) : 0;
-  const avgProcesos = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + b.fuga_procesos, 0) / numEmpresas) : 0;
-  const avgDatos = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + b.fuga_datos, 0) / numEmpresas) : 0;
-  const avgCliente = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + b.fuga_cliente, 0) / numEmpresas) : 0;
+  // Metrics Calculations (Bucket Leaks & Recoverable Hours)
+  const avgTiempo = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + (b.fuga_tiempo || 0), 0) / numEmpresas) : 0;
+  const avgProcesos = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + (b.fuga_procesos || 0), 0) / numEmpresas) : 0;
+  const avgDatos = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + (b.fuga_datos || 0), 0) / numEmpresas) : 0;
+  const avgCliente = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + (b.fuga_cliente || 0), 0) / numEmpresas) : 0;
 
-  const totalHoras = resultadosFiltrados.reduce((a, b) => a + b.horas_recuperables, 0);
+  const totalHoras = resultadosFiltrados.reduce((a, b) => a + (b.horas_recuperables || 0), 0);
   const avgHoras = numEmpresas > 0 ? (totalHoras / numEmpresas).toFixed(1) : '0.0';
   const estimadoEconomicoAnual = Math.round(totalHoras * 52 * 25); // 25€/h average wage cost
 
-  const avgN1 = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + b.salud_n1, 0) / numEmpresas) : 0;
-  const avgN2 = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + b.salud_n2, 0) / numEmpresas) : 0;
-  const avgN3 = numEmpresas > 0 ? Math.round(resultadosFiltrados.reduce((a, b) => a + b.salud_n3, 0) / numEmpresas) : 0;
+  // Flight Levels & Semáforo Calculations (only over participants who have reached/completed Etapa 3)
+  const resultadosFL = resultadosFiltrados.filter((r) => (r.salud_n1 || 0) > 0 || (r.salud_n2 || 0) > 0 || (r.salud_n3 || 0) > 0);
+  const numEmpresasFL = resultadosFL.length;
 
-  const numRojo = resultadosFiltrados.filter((r) => r.semaforo === 'rojo').length;
-  const numAmarillo = resultadosFiltrados.filter((r) => r.semaforo === 'amarillo').length;
-  const numVerde = resultadosFiltrados.filter((r) => r.semaforo === 'verde').length;
+  const avgN1 = numEmpresasFL > 0 ? Math.round(resultadosFL.reduce((a, b) => a + (b.salud_n1 || 0), 0) / numEmpresasFL) : 0;
+  const avgN2 = numEmpresasFL > 0 ? Math.round(resultadosFL.reduce((a, b) => a + (b.salud_n2 || 0), 0) / numEmpresasFL) : 0;
+  const avgN3 = numEmpresasFL > 0 ? Math.round(resultadosFL.reduce((a, b) => a + (b.salud_n3 || 0), 0) / numEmpresasFL) : 0;
 
-  // Ecosystem breakdown
-  const numGoogle = empresasArray.filter(e => e.ecosistema === 'Google').length;
-  const numMicrosoft = empresasArray.filter(e => e.ecosistema === 'Microsoft').length;
-  const numIndependiente = empresasArray.filter(e => e.ecosistema === 'Independiente').length;
+  const numRojo = resultadosFL.filter((r) => r.semaforo === 'rojo').length;
+  const numAmarillo = resultadosFL.filter((r) => r.semaforo === 'amarillo').length;
+  const numVerde = resultadosFL.filter((r) => r.semaforo === 'verde').length;
+
+  // Ecosystem breakdown across all registered companies
+  const empresasFiltradas = empresasArray.filter((e) => {
+    if (empresaFiltroId !== 'TODAS' && e.id !== empresaFiltroId) return false;
+    if (sectorFiltro !== 'Todos' && e.sector !== sectorFiltro) return false;
+    return true;
+  });
+
+  const numGoogle = empresasFiltradas.filter(e => e.ecosistema === 'Google').length;
+  const numMicrosoft = empresasFiltradas.filter(e => e.ecosistema === 'Microsoft').length;
+  const numIndependiente = empresasFiltradas.filter(e => e.ecosistema === 'Independiente').length;
 
   // Quadrant Tasks Aggregation across participants
   const todasLasTareas: { tarea: TareaParticipante; empresaNombre: string }[] = [];
@@ -670,13 +680,17 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
 
                 <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1 text-xs">
                   <span className="font-bold text-[#ED7D31] text-[11px] block">🐘 Elefantes Blancos Detectados (Software Pagado en Desuso):</span>
-                  <ul className="list-disc list-inside text-slate-300 text-[11px] space-y-1">
-                    {empresasArray.filter(e => e.herramientas_desuso).map((e, idx) => (
-                      <li key={idx}>
-                        <strong className="text-white">{e.nombre}:</strong> {e.herramientas_desuso}
-                      </li>
-                    ))}
-                  </ul>
+                  {empresasFiltradas.filter(e => e.herramientas_desuso && e.herramientas_desuso.trim().length > 0).length > 0 ? (
+                    <ul className="list-disc list-inside text-slate-300 text-[11px] space-y-1">
+                      {empresasFiltradas.filter(e => e.herramientas_desuso && e.herramientas_desuso.trim().length > 0).map((e, idx) => (
+                        <li key={idx}>
+                          <strong className="text-white">{e.nombre}:</strong> {e.herramientas_desuso}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-slate-500 italic text-[11px] pt-1">No se ha detectado software en desuso por ahora en la cohorte.</p>
+                  )}
                 </div>
               </div>
 
@@ -688,21 +702,28 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
                 </div>
 
                 <div className="space-y-2 text-xs max-h-48 overflow-y-auto">
-                  {resultadosFiltrados.flatMap((r) => r.alertas).map((alerta, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-3 rounded-xl border flex items-start gap-2.5 ${
-                        alerta.es_solido
-                          ? 'bg-emerald-950/40 border-emerald-800/50 text-emerald-300'
-                          : 'bg-amber-950/40 border-amber-800/50 text-amber-300'
-                      }`}
-                    >
-                      <span className="font-extrabold uppercase text-[9px] px-2 py-0.5 rounded bg-slate-900 border border-current shrink-0">
-                        {alerta.tipo}
-                      </span>
-                      <span className="leading-snug text-[11px]">{alerta.mensaje}</span>
+                  {resultadosFiltrados.flatMap((r) => r.alertas || []).length > 0 ? (
+                    resultadosFiltrados.flatMap((r) => r.alertas || []).map((alerta, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-xl border flex items-start gap-2.5 ${
+                          alerta.es_solido
+                            ? 'bg-emerald-950/40 border-emerald-800/50 text-emerald-300'
+                            : 'bg-amber-950/40 border-amber-800/50 text-amber-300'
+                        }`}
+                      >
+                        <span className="font-extrabold uppercase text-[9px] px-2 py-0.5 rounded bg-slate-900 border border-current shrink-0">
+                          {alerta.tipo}
+                        </span>
+                        <span className="leading-snug text-[11px]">{alerta.mensaje}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800 text-slate-400 text-xs text-center space-y-1">
+                      <p className="font-bold text-slate-300">💡 Puntos de Coaching & Alertas de Coherencia</p>
+                      <p className="text-[11px]">Las alertas se generan automáticamente cuando los participantes completan la Etapa 3 (Flight Levels).</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             </div>
@@ -714,7 +735,7 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
                   <Building className="w-5 h-5 text-[#ED7D31]" />
                   <span>Detalle Individual de Resultados por Empresa</span>
                 </div>
-                <span className="text-xs text-slate-400 font-semibold">{numEmpresas} empresas listadas</span>
+                <span className="text-xs text-slate-400 font-semibold">{empresasFiltradas.length} empresas registradas</span>
               </div>
 
               <div className="overflow-x-auto">
@@ -722,7 +743,7 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
                   <thead>
                     <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
                       <th className="p-3">Empresa</th>
-                      <th className="p-3">Sector / Ecosistema</th>
+                      <th className="p-3">Estado / Fase</th>
                       <th className="p-3">Semáforo</th>
                       <th className="p-3">Fuga Principal</th>
                       <th className="p-3">Nivel Débil</th>
@@ -731,45 +752,83 @@ export const GroupDashboard: React.FC<GroupDashboardProps> = ({ sessionId }) => 
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
-                    {resultadosFiltrados.map((res) => {
-                      const emp = empresasMap.get(res.empresa_id);
-                      return (
-                        <tr key={res.empresa_id} className="hover:bg-slate-800/40 transition-colors">
-                          <td className="p-3 font-extrabold text-white">{emp?.nombre || 'Empresa'}</td>
-                          <td className="p-3 text-slate-400">
-                            <div className="font-semibold text-slate-200">{emp?.sector}</div>
-                            <div className="text-[10px] text-slate-500">{emp?.num_empleados} emp. · {emp?.ecosistema}</div>
-                          </td>
-                          <td className="p-3">
-                            <span
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
-                                res.semaforo === 'rojo'
-                                  ? 'bg-red-950 text-red-400 border border-red-800'
-                                  : res.semaforo === 'amarillo'
-                                  ? 'bg-amber-950 text-amber-400 border border-amber-800'
-                                  : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                              }`}
-                            >
-                              {res.semaforo}
-                            </span>
-                          </td>
-                          <td className="p-3 font-semibold text-[#ED7D31]">{res.agujero_principal}</td>
-                          <td className="p-3 font-semibold text-slate-300">{res.nivel_debil}</td>
-                          <td className="p-3 text-right font-black text-white text-sm">
-                            {res.horas_recuperables}h/sem
-                          </td>
-                          <td className="p-3 text-center">
-                            <Link
-                              href={`/admin/report/${res.empresa_id}`}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#2A1545] hover:bg-[#371b5c] text-white font-extrabold text-[11px] shadow border border-[#CCBBEE]/40 transition-all cursor-pointer"
-                            >
-                              <span>Ver / Editar PDF</span>
-                              <ExternalLink className="w-3 h-3 text-[#ED7D31]" />
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {empresasFiltradas.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-6 text-center text-slate-500 font-medium">
+                          No hay empresas registradas aún. Esperando inicio de participantes...
+                        </td>
+                      </tr>
+                    ) : (
+                      empresasFiltradas.map((emp) => {
+                        const res = resultadosArray.find((r) => r.empresa_id === emp.id);
+                        const tieneFL = res && (res.salud_n1 || 0) > 0;
+                        const tieneMatriz = res && (res.horas_recuperables || 0) > 0;
+                        const tieneFugas = res && res.fuga_tiempo !== undefined;
+
+                        return (
+                          <tr key={emp.id} className="hover:bg-slate-800/40 transition-colors">
+                            <td className="p-3 font-extrabold text-white">
+                              <div>{emp.nombre}</div>
+                              <div className="text-[10px] text-slate-500 font-normal">{emp.sector} · {emp.num_empleados} emp.</div>
+                            </td>
+                            <td className="p-3 font-medium">
+                              {tieneFL ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                                  🟢 Etapa 3 Completa
+                                </span>
+                              ) : tieneMatriz ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800">
+                                  🟡 Etapa 2 Completa
+                                </span>
+                              ) : tieneFugas ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-950 text-blue-300 border border-blue-800">
+                                  🔵 Etapa 1 Completa
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                                  ⚪ En Registro (Paso 1)
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              {tieneFL ? (
+                                <span
+                                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                                    res?.semaforo === 'rojo'
+                                      ? 'bg-red-950 text-red-400 border border-red-800'
+                                      : res?.semaforo === 'amarillo'
+                                      ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                                      : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                                  }`}
+                                >
+                                  {res?.semaforo}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-500 italic">Pendiente</span>
+                              )}
+                            </td>
+                            <td className="p-3 font-semibold text-[#ED7D31]">
+                              {res?.agujero_principal || <span className="text-slate-500 font-normal italic">En proceso</span>}
+                            </td>
+                            <td className="p-3 font-semibold text-slate-300">
+                              {tieneFL ? res?.nivel_debil : <span className="text-slate-500 font-normal italic">-</span>}
+                            </td>
+                            <td className="p-3 text-right font-black text-white text-sm">
+                              {res?.horas_recuperables ? `${res.horas_recuperables}h/sem` : '0h/sem'}
+                            </td>
+                            <td className="p-3 text-center">
+                              <Link
+                                href={`/admin/report/${emp.id}`}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#2A1545] hover:bg-[#371b5c] text-white font-extrabold text-[11px] shadow border border-[#CCBBEE]/40 transition-all cursor-pointer"
+                              >
+                                <span>Ver / Editar PDF</span>
+                                <ExternalLink className="w-3 h-3 text-[#ED7D31]" />
+                              </Link>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
