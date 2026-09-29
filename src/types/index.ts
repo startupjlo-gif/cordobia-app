@@ -37,6 +37,7 @@ export interface Empresa {
   num_empleados: NumEmpleadosType;
   ecosistema: EcosistemaType;
   herramientas_desuso?: string;
+  organizacion?: string;
 }
 
 export interface Participante {

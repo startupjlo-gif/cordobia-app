@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
+  AgujeroType,
   ChipOption,
   EcosistemaType,
   EleccionCaso,
@@ -61,6 +62,9 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
   const [participanteIdState, setParticipanteIdState] = useState<string>('');
   const [nombre, setNombre] = useState<string>('');
   const [empresaNombre, setEmpresaNombre] = useState<string>('');
+  const [organizacion, setOrganizacion] = useState<string>(
+    'Autónomo / Freelance: "Yo lo hago todo: venta, ejecución y papeleo."'
+  );
   const [sector, setSector] = useState<SectorType>('Comercio y Servicios');
   const [numEmpleados, setNumEmpleados] = useState<NumEmpleadosType>('1–5');
   const [cargo, setCargo] = useState<string>('Gerente');
@@ -68,7 +72,10 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
   const [herramientasDesuso, setHerramientasDesuso] = useState<string>('');
   const [confirmacionPaso1, setConfirmacionPaso1] = useState<boolean>(false);
 
-  // Etapa 1 State (Selección de Casos de Fuga)
+  // Etapa 1 Multi-step chat state (Paso 2: Filtro Intermedio, Paso 3: Escenario Práctico de Dolor)
+  const [pasoEtapa1, setPasoEtapa1] = useState<number>(1);
+  const [filtroFriccion, setFiltroFriccion] = useState<string>('');
+  const [escenarioDolor, setEscenarioDolor] = useState<string>('');
   const [rondaActual, setRondaActual] = useState<number>(1);
   const [eleccionesCasos, setEleccionesCasos] = useState<EleccionCaso[]>([]);
   const [primeraEleccionRonda, setPrimeraEleccionRonda] = useState<string | null>(null);
@@ -127,6 +134,7 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
 
   const handleConfirmarPaso1 = () => {
     setConfirmacionPaso1(true);
+    setPasoEtapa1(2);
     agregarMensajeParticipante('✅ Ficha de empresa confirmada.');
 
     const newEmpId = empresaIdState || generateUUID();
@@ -134,13 +142,20 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
     setEmpresaIdState(newEmpId);
     setParticipanteIdState(newPartId);
 
+    // Map organizacion to numEmpleados
+    let numEmpMapped: NumEmpleadosType = '1–5';
+    if (organizacion.startsWith('Pequeño equipo')) numEmpMapped = '6–20';
+    else if (organizacion.startsWith('Empresa pyme')) numEmpMapped = '21–50';
+    setNumEmpleados(numEmpMapped);
+
     const empObj: Empresa = {
       id: newEmpId,
       nombre: empresaNombre,
       sector,
-      num_empleados: numEmpleados,
+      num_empleados: numEmpMapped,
       ecosistema,
-      herramientas_desuso: herramientasDesuso
+      herramientas_desuso: herramientasDesuso,
+      organizacion
     };
 
     mockStore.empresas.set(newEmpId, empObj);
@@ -164,134 +179,162 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
     setTimeout(() => {
       setIsTyping(false);
       agregarMensajeAgente(
-        `¡Perfecto, ${nombre}! Ficha guardada para ${empresaNombre}.\n\nEtapa 1 (Puntos de Fuga): Te presentaré 4 situaciones cotidianas para evaluar dónde está la mayor fuga de tu empresa.`
-      );
-
-      const casosR1 = CASOS_BASE_BALDE.filter((c) => c.ronda === 1);
-      agregarMensajeAgente(
-        'Ronda 1 de 3: Elige la situación con la que MÁS te identificas:',
-        casosR1.map((c) => ({ id: c.case_id, label: c.texto_base, value: c.case_id }))
+        `¡Perfecto, ${nombre}! Ficha guardada para ${empresaNombre}.\n\nEtapa 1 - Paso 2: El Filtro Intermedio (Grado de Fricción Operativa)\n\n«Si tuvieras que ser honesto con la forma en que gestionáis el día a día hoy, ¿cuál es tu punto de partida?»`,
+        [
+          {
+            id: 'friccion_1',
+            label: 'La información está en libretas, chats personales, llamadas y la memoria de las personas.',
+            value: 'libretas'
+          },
+          {
+            id: 'friccion_2',
+            label: 'Usamos herramientas (Excel, programa de facturación, correo), pero nada se conecta entre sí y hay que pasar datos a mano.',
+            value: 'herramientas_desconectadas'
+          },
+          {
+            id: 'friccion_3',
+            label: 'Tenemos software (CRM, ERP, TPV), pero requiere demasiado tiempo manual para alimentar los sistemas o no le sacamos provecho.',
+            value: 'software_manual'
+          },
+          {
+            id: 'friccion_4',
+            label: 'Estoy montando o reestructurando el modelo y quiero elegir bien las herramientas desde el principio.',
+            value: 'reestructurando'
+          }
+        ]
       );
     }, 600);
   };
 
-  // ETAPA 1: SELECCIÓN DE CASOS (3 RONDAS)
-  const handleSeleccionarCaso = (caseId: string, label: string) => {
-    agregarMensajeParticipante(`Elegido: "${label}"`);
+  // ETAPA 1: PASO 2 (FILTRO INTERMEDIO) Y PASO 3 (ESCENARIO PRÁCTICO DE DOLOR)
+  const handleSeleccionarCaso = (value: string, label: string) => {
+    agregarMensajeParticipante(`"${label}"`);
 
-    if (!primeraEleccionRonda) {
-      setPrimeraEleccionRonda(caseId);
-      const opcionesRestantes = CASOS_BASE_BALDE.filter(
-        (c) => c.ronda === rondaActual && c.case_id !== caseId
-      ).map((c) => ({ id: c.case_id, label: c.texto_base, value: c.case_id }));
+    if (pasoEtapa1 === 2) {
+      // Completed Paso 2 (Filtro Intermedio), proceed to Paso 3 (Escenario Práctico de Dolor)
+      setFiltroFriccion(value);
+      setPasoEtapa1(3);
 
       setIsTyping(true);
       setTimeout(() => {
         setIsTyping(false);
         agregarMensajeAgente(
-          `Entendido. Y en SEGUNDO lugar, ¿con cuál de estas 3 opciones te identificas también?`,
-          opcionesRestantes
+          `Entendido. Registramos tu punto de partida tecnológico y operativo.\n\nEtapa 1 - Paso 3: El Escenario Práctico de Dolor (El Diagnóstico Final)\n\n«Pensando en tu operativa habitual, ¿cuál es el verdadero 'cuello de botella' que te impide crecer o vivir más tranquilo?»`,
+          [
+            {
+              id: 'dolor_tiempo',
+              label: 'El papeleo y las tareas repetitivas (picar albaranes, hacer facturas a mano, responder las mismas dudas por WhatsApp).',
+              value: 'TIEMPO'
+            },
+            {
+              id: 'dolor_procesos',
+              label: 'La \'dueño-dependencia\' o \'persona-dependencia\': si el responsable no está o no decide, la tarea se frena o se cometen errores.',
+              value: 'PROCESOS'
+            },
+            {
+              id: 'dolor_datos',
+              label: 'Ir a ciegas con la rentabilidad: vendemos, pero no sé con certeza qué producto, servicio o cliente me deja dinero real tras costes.',
+              value: 'DATOS'
+            },
+            {
+              id: 'dolor_cliente',
+              label: 'La pérdida de oportunidades: no llevar un seguimiento de presupuestos, no fidelizar al cliente que ya compró o tratar a todos por igual.',
+              value: 'CLIENTE'
+            }
+          ]
         );
       }, 500);
     } else {
-      const nuevaEleccion: EleccionCaso = {
-        ronda: rondaActual,
-        case_id_primera: primeraEleccionRonda,
-        case_id_segunda: caseId
+      // Completed Paso 3 (Escenario Práctico de Dolor) -> Finalize Etapa 1
+      setEscenarioDolor(label);
+
+      const agujeroPrincipalMap: Record<string, AgujeroType> = {
+        'TIEMPO': 'Tiempo',
+        'PROCESOS': 'Procesos',
+        'DATOS': 'Datos',
+        'CLIENTE': 'Cliente'
       };
-      const todasElecciones = [...eleccionesCasos, nuevaEleccion];
-      setEleccionesCasos(todasElecciones);
-      setPrimeraEleccionRonda(null);
+      const agujeroPrincipal = agujeroPrincipalMap[value] || 'Tiempo';
 
-      if (rondaActual < 3) {
-        const siguienteRonda = rondaActual + 1;
-        setRondaActual(siguienteRonda);
-        setIsTyping(true);
-        setTimeout(() => {
-          setIsTyping(false);
-          const casosSiguiente = CASOS_BASE_BALDE.filter((c) => c.ronda === siguienteRonda);
-          agregarMensajeAgente(
-            `Ronda ${siguienteRonda} de 3: Elige la situación con la que MÁS te identificas:`,
-            casosSiguiente.map((c) => ({ id: c.case_id, label: c.texto_base, value: c.case_id }))
-          );
-        }, 500);
-      } else {
-        // FIN DE ETAPA 1 -> GUARDAR RESULTADO DE FUGA DE ETAPA 1 INCREMENTALMENTE
-        const intensidadesDefault: IntensidadAgujero[] = [
-          { agujero: 'Tiempo', intensidad: 4 },
-          { agujero: 'Procesos', intensidad: 4 },
-          { agujero: 'Datos', intensidad: 3 },
-          { agujero: 'Cliente', intensidad: 2 }
-        ];
+      let baseFriccion = 50;
+      if (filtroFriccion === 'libretas') baseFriccion = 65;
+      else if (filtroFriccion === 'herramientas_desconectadas') baseFriccion = 55;
+      else if (filtroFriccion === 'software_manual') baseFriccion = 45;
+      else if (filtroFriccion === 'reestructurando') baseFriccion = 35;
 
-        const { fugas, agujeroPrincipal } = calcularFugasBalde(todasElecciones, intensidadesDefault);
+      const fugas: Record<AgujeroType, number> = {
+        Tiempo: agujeroPrincipal === 'Tiempo' ? 85 : Math.max(20, baseFriccion),
+        Procesos: agujeroPrincipal === 'Procesos' ? 85 : Math.max(20, baseFriccion),
+        Datos: agujeroPrincipal === 'Datos' ? 85 : Math.max(20, baseFriccion),
+        Cliente: agujeroPrincipal === 'Cliente' ? 85 : Math.max(20, baseFriccion)
+      };
 
-        const empId = empresaIdState || generateUUID();
-        const partId = participanteIdState || generateUUID();
-        if (!empresaIdState) setEmpresaIdState(empId);
-        if (!participanteIdState) setParticipanteIdState(partId);
+      const empId = empresaIdState || generateUUID();
+      const partId = participanteIdState || generateUUID();
+      if (!empresaIdState) setEmpresaIdState(empId);
+      if (!participanteIdState) setParticipanteIdState(partId);
 
-        const empObj: Empresa = {
-          id: empId,
-          nombre: empresaNombre,
-          sector,
-          num_empleados: numEmpleados,
-          ecosistema,
-          herramientas_desuso: herramientasDesuso
-        };
+      const empObj: Empresa = {
+        id: empId,
+        nombre: empresaNombre,
+        sector,
+        num_empleados: numEmpleados,
+        ecosistema,
+        herramientas_desuso: herramientasDesuso,
+        organizacion
+      };
 
-        const resEtapa1: ResultadoDiagnostico = {
-          participante_id: partId,
-          empresa_id: empId,
-          fuga_tiempo: fugas.Tiempo,
-          fuga_procesos: fugas.Procesos,
-          fuga_datos: fugas.Datos,
-          fuga_cliente: fugas.Cliente,
-          agujero_principal: agujeroPrincipal,
-          salud_n1: 0,
-          salud_n2: 0,
-          salud_n3: 0,
-          nivel_debil: 'N1',
-          semaforo: 'amarillo',
-          horas_recuperables: 0,
-          hoja_ruta: DEFAULT_HOJA_RUTA,
-          alertas: [],
-          fugas: fugas,
-          version_reglas: '1.0.0',
-          etapa_completada: 1
-        };
+      const resEtapa1: ResultadoDiagnostico = {
+        participante_id: partId,
+        empresa_id: empId,
+        fuga_tiempo: fugas.Tiempo,
+        fuga_procesos: fugas.Procesos,
+        fuga_datos: fugas.Datos,
+        fuga_cliente: fugas.Cliente,
+        agujero_principal: agujeroPrincipal,
+        salud_n1: 0,
+        salud_n2: 0,
+        salud_n3: 0,
+        nivel_debil: 'N1',
+        semaforo: 'amarillo',
+        horas_recuperables: 0,
+        hoja_ruta: DEFAULT_HOJA_RUTA,
+        alertas: [],
+        fugas: fugas,
+        version_reglas: '1.0.0',
+        etapa_completada: 1
+      };
 
-        mockStore.empresas.set(empId, empObj);
-        mockStore.resultados.set(partId, resEtapa1);
-        mockStore.saveToLocalStorage();
-        mockStore.syncToSupabase(empObj, resEtapa1);
+      mockStore.empresas.set(empId, empObj);
+      mockStore.resultados.set(partId, resEtapa1);
+      mockStore.saveToLocalStorage();
+      mockStore.syncToSupabase(empObj, resEtapa1);
 
-        try {
-          fetch('/api/store', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'save_resultado',
-              empresa: empObj,
-              resultado: resEtapa1
-            })
-          }).catch((err) => console.warn('API save_resultado Etapa 1 error:', err));
-        } catch (e) {
-          console.warn('API save_resultado Etapa 1 exception:', e);
-        }
-
-        setIsTyping(true);
-        setTimeout(() => {
-          setIsTyping(false);
-          agregarMensajeAgente(
-            `🛑 **¡Etapa 1 Completada!**\n\nHemos registrado los puntos principales de fuga de tu empresa (Principal: **${agujeroPrincipal.toUpperCase()}**). Por favor, atiende las explicaciones del mentor en la pantalla principal antes de iniciar la Etapa 2.`
-          );
-
-          setEsperandoAutorizacionMentor(true);
-          setEtapaEnPausaTexto('Etapa 1 Finalizada (Puntos de Fuga)');
-          setSiguienteEtapaNombre('Iniciar Etapa 2 (Matriz Frecuencia / Valor)');
-        }, 700);
+      try {
+        fetch('/api/store', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'save_resultado',
+            empresa: empObj,
+            resultado: resEtapa1
+          })
+        }).catch((err) => console.warn('API save_resultado Etapa 1 error:', err));
+      } catch (e) {
+        console.warn('API save_resultado Etapa 1 exception:', e);
       }
+
+      setIsTyping(true);
+      setTimeout(() => {
+        setIsTyping(false);
+        agregarMensajeAgente(
+          `🛑 **¡Etapa 1 Completada!**\n\nHemos registrado los puntos principales de fuga de tu empresa (Principal: **${agujeroPrincipal.toUpperCase()}**). Por favor, atiende las explicaciones del mentor en la pantalla principal antes de iniciar la Etapa 2.`
+        );
+
+        setEsperandoAutorizacionMentor(true);
+        setEtapaEnPausaTexto('Etapa 1 Finalizada (Puntos de Fuga)');
+        setSiguienteEtapaNombre('Iniciar Etapa 2 (Matriz Frecuencia / Valor)');
+      }, 700);
     }
   };
 
@@ -790,84 +833,61 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
                     <span>Ficha de Empresa y Participante</span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <div className="space-y-4 text-xs">
                     <div>
-                      <label className="block text-slate-600 font-semibold mb-1">Nombre completo *</label>
+                      <label className="block text-slate-700 font-semibold mb-1">Nombre completo del participante *</label>
                       <input
                         type="text"
                         value={nombre}
                         onChange={(e) => setNombre(e.target.value)}
                         placeholder="Ej: Ana Pérez"
-                        className="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#2A1545] outline-none"
+                        className="w-full p-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#2A1545] outline-none text-xs md:text-sm"
                       />
                     </div>
+
                     <div>
-                      <label className="block text-slate-600 font-semibold mb-1">Nombre de la Empresa *</label>
+                      <label className="block text-slate-700 font-semibold mb-1">Nombre de la Empresa *</label>
                       <input
                         type="text"
                         value={empresaNombre}
                         onChange={(e) => setEmpresaNombre(e.target.value)}
                         placeholder="Ej: Panadería El Trigo S.L."
-                        className="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#2A1545] outline-none"
+                        className="w-full p-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#2A1545] outline-none text-xs md:text-sm"
                       />
                     </div>
+
                     <div>
-                      <label className="block text-slate-600 font-semibold mb-1">Sector de Actividad *</label>
+                      <label className="block text-slate-700 font-semibold mb-1.5">
+                        ¿Cómo está organizado tu negocio o proyecto hoy? *
+                      </label>
                       <select
-                        value={sector}
-                        onChange={(e) => setSector(e.target.value as SectorType)}
-                        className="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#2A1545] outline-none bg-white"
+                        value={organizacion}
+                        onChange={(e) => setOrganizacion(e.target.value)}
+                        className="w-full p-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#2A1545] outline-none bg-white font-medium text-xs leading-snug"
                       >
-                        <option value="Comercio y Servicios">Comercio y Servicios</option>
-                        <option value="Agroalimentario e Industria">Agroalimentario e Industria</option>
-                        <option value="Servicios Profesionales">Servicios Profesionales</option>
-                        <option value="Administración General">Administración General</option>
+                        <option value='Autónomo / Freelance: "Yo lo hago todo: venta, ejecución y papeleo."'>
+                          Autónomo / Freelance: "Yo lo hago todo: venta, ejecución y papeleo."
+                        </option>
+                        <option value='Pequeño equipo (2 a 15 personas): "Hay equipo, pero la toma de decisiones y el control pasan por mí."'>
+                          Pequeño equipo (2 a 15 personas): "Hay equipo, pero la toma de decisiones y el control pasan por mí."
+                        </option>
+                        <option value='Empresa pyme (+15 personas): "Hay departamentos o áreas diferenciadas."'>
+                          Empresa pyme (+15 personas): "Hay departamentos o áreas diferenciadas."
+                        </option>
+                        <option value='Idea / Proyecto en fase de despegue: "Aún no opero al 100%, pero quiero nacer bien estructurado."'>
+                          Idea / Proyecto en fase de despegue: "Aún no opero al 100%, pero quiero nacer bien estructurado."
+                        </option>
                       </select>
-                    </div>
-                    <div>
-                      <label className="block text-slate-600 font-semibold mb-1">Número de Empleados *</label>
-                      <select
-                        value={numEmpleados}
-                        onChange={(e) => setNumEmpleados(e.target.value as NumEmpleadosType)}
-                        className="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#2A1545] outline-none bg-white"
-                      >
-                        <option value="1–5">1–5 empleados</option>
-                        <option value="6–20">6–20 empleados</option>
-                        <option value="21–50">21–50 empleados</option>
-                        <option value="Más de 50">Más de 50 empleados</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-slate-600 font-semibold mb-1">Ecosistema Principal</label>
-                      <select
-                        value={ecosistema}
-                        onChange={(e) => setEcosistema(e.target.value as EcosistemaType)}
-                        className="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#2A1545] outline-none bg-white"
-                      >
-                        <option value="Google">Google Workspace / Drive</option>
-                        <option value="Microsoft">Microsoft 365 / Excel / Copilot</option>
-                        <option value="Independiente">Herramientas Independientes</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-slate-600 font-semibold mb-1">Herramientas en Desuso</label>
-                      <input
-                        type="text"
-                        value={herramientasDesuso}
-                        onChange={(e) => setHerramientasDesuso(e.target.value)}
-                        placeholder="Ej: CRM o ERP pagado sin usar"
-                        className="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#2A1545] outline-none"
-                      />
                     </div>
                   </div>
 
                   <button
                     onClick={handleConfirmarPaso1}
                     disabled={!nombre || !empresaNombre}
-                    className={`w-full py-3 rounded-xl font-bold text-white shadow flex items-center justify-center gap-2 ${
+                    className={`w-full py-3.5 rounded-xl font-bold text-white shadow-md flex items-center justify-center gap-2 transition-all ${
                       nombre && empresaNombre
                         ? 'bg-[#2A1545] hover:bg-[#371b5c] cursor-pointer'
-                        : 'bg-slate-300 cursor-not-allowed'
+                        : 'bg-slate-300 cursor-not-allowed opacity-60'
                     }`}
                   >
                     <CheckCircle className="w-4 h-4 text-[#ED7D31]" />
