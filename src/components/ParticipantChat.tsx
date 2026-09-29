@@ -879,6 +879,34 @@ export const ParticipantChat: React.FC<ParticipantChatProps> = ({ sessionCode = 
                         </option>
                       </select>
                     </div>
+
+                    <div>
+                      <label className="block text-slate-700 font-semibold mb-1">
+                        5. Ecosistema Tecnológico Principal *
+                      </label>
+                      <select
+                        value={ecosistema}
+                        onChange={(e) => setEcosistema(e.target.value as EcosistemaType)}
+                        className="w-full p-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#2A1545] outline-none bg-white font-medium text-xs md:text-sm"
+                      >
+                        <option value="Google">Google Workspace / Drive</option>
+                        <option value="Microsoft">Microsoft 365 / Excel / Copilot</option>
+                        <option value="Independiente">Herramientas Independientes / Mix</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-700 font-semibold mb-1">
+                        Elefantes Blancos (Herramientas pagadas o software en desuso)
+                      </label>
+                      <input
+                        type="text"
+                        value={herramientasDesuso}
+                        onChange={(e) => setHerramientasDesuso(e.target.value)}
+                        placeholder="Ej: CRM o ERP contratado sin usar, licencias duplicadas"
+                        className="w-full p-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#2A1545] outline-none text-xs md:text-sm"
+                      />
+                    </div>
                   </div>
 
                   <button
